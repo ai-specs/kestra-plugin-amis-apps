@@ -1,0 +1,70 @@
+name: Publish verified AMIS artifact
+
+on:
+  workflow_run:
+    workflows: [AMIS independent checks]
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+  packages: write
+
+jobs:
+  publish:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - name: Download the successful source run artifact without rebuilding
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN_ID: ${{ github.event.workflow_run.id }}
+          SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: gh run download "$SOURCE_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "amis-foundation-$SOURCE_SHA" --dir .
+      - name: Stage exact tested bytes and completed source CI proof
+        run: python3 scripts/package-release.py .work/release-image
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Publish immutable artifact bundle without an application server image
+        id: publish
+        uses: docker/build-push-action@v6
+        with:
+          context: .work/release-image
+          push: true
+          tags: ghcr.io/ai-specs/kestra-plugin-amis-apps-artifact:${{ github.event.workflow_run.head_sha }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/ai-specs/kestra-plugin-amis-apps
+            org.opencontainers.image.revision=${{ github.event.workflow_run.head_sha }}
+            owner=amis-release-${{ github.run_id }}
+      - name: Record actual registry digest
+        env:
+          PUBLISHED_DIGEST: ${{ steps.publish.outputs.digest }}
+        run: |
+          python3 - <<'PY'
+          import json, os, pathlib, re
+          digest = os.environ['PUBLISHED_DIGEST']
+          assert re.fullmatch(r'sha256:[a-f0-9]{64}', digest)
+          provenance = json.loads(pathlib.Path('.work/release-image/release/release-provenance.json').read_text())
+          pathlib.Path('.work/publication-receipt.json').write_text(json.dumps({
+              'image': 'ghcr.io/ai-specs/kestra-plugin-amis-apps-artifact@' + digest,
+              'sourceCommit': provenance['commit'], 'sourceCi': provenance['sourceCi'],
+              'jarSha256': provenance['jarSha256'], 'publisherRunId': os.environ['GITHUB_RUN_ID']
+          }, indent=2) + '\n')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: amis-publication-${{ github.event.workflow_run.head_sha }}
+          include-hidden-files: true
+          if-no-files-found: error
+          path: |
+            .work/publication-receipt.json
+            .work/release-image/release/release-provenance.json

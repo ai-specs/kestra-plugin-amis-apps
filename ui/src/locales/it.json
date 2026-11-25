@@ -1,0 +1,15 @@
+{
+  "it": {
+    "loading": "Loading schema…",
+    "waiting": "Waiting for execution result…",
+    "success": "Result ready",
+    "logout": "Sign out / switch account",
+    "cancel": "Cancel request",
+    "theme": "Theme",
+    "language": "Language",
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System",
+    "error": "Unable to complete request"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "scope": "shared producer/consumer contract tests; not production acceptance evidence",
+  "binding": {"namespace": "company.demo", "flowId": "greeting-app", "apiId": "greet", "executionId": "execution123", "resultOutput": "response"},
+  "cases": [
+    {"id": "created-pending", "factory": "pending", "httpStatus": 202, "executionState": "CREATED", "selectedOutput": null, "expect": {"status": 0, "data": {}, "resultReady": false}},
+    {"id": "running-pending", "factory": "pending", "httpStatus": 202, "executionState": "RUNNING", "selectedOutput": null, "expect": {"status": 0, "data": {}, "resultReady": false}},
+    {"id": "terminal-output-not-ready", "factory": "pending", "httpStatus": 202, "executionState": "SUCCESS", "selectedOutput": null, "expect": {"status": 0, "data": {}, "resultReady": false}},
+    {"id": "success-object", "factory": "ready", "httpStatus": 200, "executionState": "SUCCESS", "selectedOutput": {"greeting": "Hello Ada"}, "expect": {"status": 0, "data": {"greeting": "Hello Ada"}, "resultReady": true}},
+    {"id": "success-present-empty-object", "factory": "ready", "httpStatus": 200, "executionState": "SUCCESS", "selectedOutput": {}, "expect": {"status": 0, "data": {}, "resultReady": true}},
+    {"id": "warning-present-object", "factory": "ready", "httpStatus": 200, "executionState": "WARNING", "selectedOutput": {"warning": true}, "expect": {"status": 0, "data": {"warning": true}, "resultReady": true}},
+    {"id": "failed-is-not-success", "factory": "failed", "httpStatus": 200, "executionState": "FAILED", "selectedOutput": {}, "expect": {"status": 1, "data": {}, "resultReady": true}},
+    {"id": "killed-is-not-success", "factory": "failed", "httpStatus": 200, "executionState": "KILLED", "selectedOutput": {}, "expect": {"status": 1, "data": {}, "resultReady": true}},
+    {"id": "cancelled-is-not-success", "factory": "failed", "httpStatus": 200, "executionState": "CANCELLED", "selectedOutput": {}, "expect": {"status": 1, "data": {}, "resultReady": true}},
+    {"id": "running-cannot-be-ready", "factory": "ready", "httpStatus": 200, "executionState": "RUNNING", "selectedOutput": {"value": true}, "reject": true},
+    {"id": "unknown-state-cannot-be-ready", "factory": "ready", "httpStatus": 200, "executionState": "NOT_A_STATE", "selectedOutput": {"value": true}, "reject": true},
+    {"id": "missing-result-is-not-empty-result", "factory": "ready", "httpStatus": 200, "executionState": "SUCCESS", "selectedOutput": null, "reject": true},
+    {"id": "string-result-is-not-object", "factory": "ready", "httpStatus": 200, "executionState": "SUCCESS", "selectedOutput": "result", "reject": true}
+  ]
+}

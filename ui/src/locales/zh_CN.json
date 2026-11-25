@@ -1,0 +1,15 @@
+{
+  "zh_CN": {
+    "loading": "正在加载页面…",
+    "waiting": "正在等待执行结果…",
+    "success": "结果已就绪",
+    "logout": "退出并更换账号",
+    "cancel": "取消请求",
+    "theme": "主题",
+    "language": "语言",
+    "light": "浅色",
+    "dark": "深色",
+    "system": "跟随系统",
+    "error": "无法完成请求"
+  }
+}

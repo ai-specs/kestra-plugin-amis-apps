@@ -12,6 +12,8 @@ TYPES = (
     'io.kestra.core.models.executions.Execution',
     'io.kestra.webserver.rbac.TypedAuthorization',
     'io.kestra.webserver.oidc.TrustedIdentityV2',
+    'io.kestra.webserver.rbac.HttpExtensionRouteProviderV1',
+    'io.kestra.webserver.rbac.HttpExtensionRouteProviderV1$Target',
 )
 
 
@@ -88,6 +90,8 @@ def verify(area=None):
         raise ValueError('Host public type inventory differs from provenance')
     if provenance['flowValidationSha256'] != sha256(area / 'host-flow-validation.txt'):
         raise ValueError('Host Flow validation inventory differs from provenance')
+    if provenance['publicTypes'] != list(TYPES):
+        raise ValueError('Host public type inventory is stale; rerun prepare-host.sh for the fixed formal input')
     print('Fixed host digest and artifact SHA-256 verified')
 
 

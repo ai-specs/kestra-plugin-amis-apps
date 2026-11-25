@@ -3,56 +3,62 @@
 独立 AMIS Apps 扩展。一个 Flow 承载 JSON 页面声明、页面 API 与执行逻辑。
 应用变更无需编译应用专属前端；扩展固定运行时按本仓独立发布。
 
-当前状态：独立仓基础 CI 已通过并由主控下载审计；当前触发器模型改动尚未通过独立 CI，
-没有 HTTP/授权/执行运行时或生产组合验收，不是 P0 交付。不得据此目录部署生产。
+当前实现覆盖 P0 的单页面、单 API、固定 AMIS 运行时及其认证、授权和有界执行接线。
+P1 复杂控件、P2 多页面/API 激活和 P3 编辑器不在此版本范围。
+取用时必须核对所选提交的成功检查、独立发布 workflow 与 `release-provenance.json`；
+根仓生产组合验收是另一道必需门，不能把模型阶段的 jar 或组件测试当作 P0 阶段交付。
 总体需求基线为部署仓 `docs/amis-apps-requirements.md`，版本
 `23d837333003ee2f4918784d001c5ffa191dd799`；构建不得读取部署仓文件。
 
 本仓负责业务声明、页面/API、schema、编辑器和自身浏览器门；宿主提供公开契约，
 RBAC 提供统一权限策略，部署仓负责模式 A/B 的正式 Compose 验收。
 
-### 已审计的基础 CI（历史范围，不包含当前模型改动）
+### 已审计的模型 CI（历史范围，不包含当前运行时改动）
 
-主控已核对基础提交 `692fbcd7d28f5a5ca6f0f29d6bdcbd9c8b0f0791` 的成功 CI
-`45644295878`，实际下载 artifact `15037706392`：82 项 XML 测试零失败、零错误、零跳过，
-4 项构建负例通过；基础 jar SHA-256 为
-`4db149c55a0c440c76b9e2f6f62e09694fff4fe0ec0787ee7690084f7678e49d`。
-这只证明当时的纯领域基础、正式输入与薄 jar 门，不证明本轮触发器模型、新门规则、
+主控已核对模型提交 `fde169e83d821b193103bf6c8cfa5a79825f94c3` 的成功 CI
+`45664780692`，实际下载 artifact `15047905420`：156 项 XML 测试零失败、零错误、零跳过，
+10 项构建负例通过；模型 jar SHA-256 为
+`06414141302a4626d1938ff31bb2f621eb990e4ed3029f0f5ed28eddc45b26dc`。
+这只证明当时的触发器模型、正式输入与薄 jar 门，不证明本轮运行时、新门规则、
 HTTP、真实授权、Flow execution、页面或生产组合已经通过或发布。
 
 ## 当前模型范围
 
 基础标识：`AMIS-FOUNDATION-20261125`。现已增加真实 `PageTrigger`、`ApiTrigger` 声明模型，
 可以经宿主 PluginRegistry、YamlParser、schema 生成与 ModelValidator 使用。
-这不是完整 P0，也没有可提供页面或触发执行的运行时。
-没有 Controller、业务 Micronaut bean、授权实现、存储访问或执行入口。
+P0 使用一个 `HttpExtensionRouteProviderV1` bean，通过宿主正式公开类型访问 Flow、
+执行和 namespace files。字段、请求顺序与有界行为见
+[运行时契约](docs/runtime-contract.md)。源码和定向测试存在不表示所选产物已经通过发布门。
 两类直接继承既有正式 `AbstractTrigger`，不继承 `AbstractWebhookTrigger`，
 不消费任何未发布新宿主 SPI；独立纯领域类型仍不依赖宿主类型。
 不复制旧 dsh 实现，不读取 RBAC 私有模型，不提供匿名或其他授权旁路。
 
-### Flow 声明模型（尚未发布）
+### Flow 声明模型
 
 ```yaml
 id: example.app
 namespace: company._team
+inputs:
+  - id: name
+    type: STRING
+    required: true
 tasks:
-  - id: log
-    type: io.kestra.plugin.core.log.Log
-    message: model only
+  - id: echo
+    type: io.kestra.plugin.core.debug.Return
+    format: "{{ inputs.name }}"
+outputs:
+  - id: response
+    type: JSON
+    value:
+      message: "{{ outputs.echo.value }}"
 triggers:
   - id: page-home
     type: io.kestra.plugin.amis.apps.PageTrigger
     pageId: home
     schema: nsfile:///pages/home.json
-  - id: api-home
+  - id: api-greet
     type: io.kestra.plugin.amis.apps.ApiTrigger
-    apiId: home
-  - id: api-save
-    type: io.kestra.plugin.amis.apps.ApiTrigger
-    apiId: save
-    mode: SYNC
-    syncTimeout: PT10S
-    resultOutput: response
+    apiId: greet
 ```
 
 - `id` 是宿主 trigger 标识，遵守上游校验与 Flow 内唯一规则，页面和 API 也不能共享此 id。
@@ -68,8 +74,8 @@ triggers:
   使用正式宿主 Output.id 的模式 `^[a-zA-Z0-9][.a-zA-Z0-9_-]*`，非空且拒绝路径、编码及空白。
   字段只做标识语法校验；对应 Flow output 是否存在、JSON 对象类型与执行结果来源由后续业务服务检查。
 - 模型可以表达多个页面/API，不永久限制声明数量。同名 pageId/apiId 仍允许，trigger id 仍须唯一。
-  P0 目标只激活各一个页面和 API，多声明必须由后续 handler 拒绝，不能静默任选；当前没有 handler，
-  不激活任何页面或 API。目标设计见 `docs/runtime-contract.md`，该文档尚未发布，不代表运行时已交付。
+  P0 只激活各一个页面和 API；`RouteDeclarations` 对多声明、重复或禁用状态明确拒绝，
+  不静默任选。具体请求行为见 `docs/runtime-contract.md`。
 - 原生继承字段继续由宿主解析和校验，未知字段由真实严格 YamlParser 拒绝。
   页面/API 路由集合冲突仍由纯领域 `FlowDeclarations` 校验；当前没有保存拦截器或全局路由注册器，
   不宣称单个模型约束已替代整个 Flow 的路由集合检查。
@@ -77,7 +83,7 @@ triggers:
   仅有 class 或合法 introspection 但没有 Plugin 服务声明，不能成为已登记插件类型。
   模型带真实生成的 `@Introspected` 元数据，不注册为 singleton，不生成业务 bean。
 
-### 领域约定（尚未发布）
+### 领域约定
 
 - URL 原始路径为 `/{namespace}/{flowId}/pages/{pageId}` 或
   `/{namespace}/{flowId}/apis/{apiId}`。仅解析原始路径，不接受完整 URL、query、fragment、
@@ -96,8 +102,8 @@ triggers:
   路径本身不携带 namespace；例如路径中的 `other` 只是当前 namespace 的目录，
   不能指定兄弟 namespace。候选由 `company.team.app`、`company.team`、`company`
   按顺序组成，路径不变，没有空 namespace、兄弟或无关 namespace 候选。
-  此阶段只生成不可变候选列表，不读文件、不执行回退。后续解析器必须仅在文件不存在
-  时尝试下一候选；当前文件非法或读取异常不得静默改用父级文件。
+  `SchemaResolver` 只在文件不存在时尝试下一候选；当前文件非法或读取异常不得静默
+  改用父级文件。`PublishedNamespaceFiles` 消费正式 NamespaceFactory，不新增运行文件授权。
 - JSON 必须为严格 UTF-8，大小为 1 至 1,048,576 字节，最大容器嵌套深度 64
   （根对象计一层）。根必须是对象且 `type` 等于字符串 `page`。
   重复 JSON key、尾随 JSON、注释、非法编码和超限输入拒绝。
@@ -109,17 +115,61 @@ triggers:
 - API 未声明模式时为 `ASYNC`。`SYNC` 必须显式指定，并同时提供大于零且不超过
   30 秒的 timeout。ASYNC 不接受 SYNC timeout 参数。
   `RuntimeLimits` 单独表示部署维护的 SYNC 总并发边界，范围为 1 至 32；
-  不由每个 API 声明独立总池。两者均只校验配置，不实际调度资源。
-  这些数值是当前库的候选配置边界，不是已发布运行契约。
-  尚未实现等待、并发许可、取消、执行创建、轮询、到期响应或资源释放；不以 SSE 为契约。
+  不由每个 API 声明独立总池。HTTP 运行时使用全局 semaphore 执行此并发边界，
+  `kestra.amis-apps.max-sync-concurrency` 默认 4，可配置 1 至 32；不按账号身份豁免。
+  运行时通过宿主公开执行链提交，SYNC 使用有界等待及并发许可；超时返回真实 execution
+  的 pending 信封供后续轮询，取消只停止 HTTP 等待，不冒称已取消 Flow execution。不以 SSE 为契约。
+
+### P0 页面与权限准备
+
+在上述 Flow 的 `company._team` namespace file 中保存 `/pages/home.json`：
+
+```json
+{
+  "type": "page",
+  "title": "Greeting",
+  "body": {
+    "type": "form",
+    "api": "post:greet",
+    "body": [
+      {"type": "input-text", "name": "name", "label": "Name", "required": true},
+      {"type": "tpl", "tpl": "Result: ${message}"}
+    ],
+    "actions": [{"type": "submit", "label": "Submit"}]
+  }
+}
+```
+
+开启 `kestra.amis-apps.enabled: true`，用生产登录访问
+`/company._team/example.app/pages/home`。Flow 的 `response` output 必须已声明；
+缺少声明返回 409，不创建 execution。已声明结果尚未可读时继续 pending，不能伪装为空成功。
+具体部署、正式镜像/jar 选择和容器更新由部署仓 README 负责，不在本仓重新构建宿主。
+
+模式 A 不装载 RBAC jar，但仍要求登录和 CSRF。模式 B 在已有 `kestra-ui` 应用的运行时
+权限中显式维护 `EXTENSION_ROUTE / EXECUTE`、namespace 表达式和精确 ID `amis-apps`，
+关联当前用户已获授的既有 scope。入口能力不自动补授给首装账号，也不新增应用成员或 tab。
+它不替代具体 Flow READ/EXECUTE、执行创建及结果 READ/ACCESS_OUTPUTS。授权放行后，运行
+schema 可以读取当前或父级文件，不另加文件级授权；编辑管理不继承此运行读取许可。
+
+### 独立产物与报告发布
+
+push CI 上传 GitHub Actions artifact。独立发布 workflow 只在该源 CI 已经 completed/success
+后下载其原始 artifact，不重新编译，再发布仅包含 jar、报告和 source snapshot 的
+`ghcr.io/ai-specs/kestra-plugin-amis-apps-artifact:<commit>` 包。它不是可以启动的应用服务镜像。
+部署消费必须固定实际 digest，核对 `release/release-provenance.json` 中 commit、jar SHA-256、
+host 输入、已完成的 `sourceCi` 及报告，不能只信任可重用 tag。使用 `docker create` 时指定一个占位 command，
+只 `docker cp` 读取 `/release` 并删除 created 状态容器；不得启动此产物包。
+该私有包的跨仓 Actions Read 必须单独授予部署仓，不能用个人 token 绕过权限配置。
 
 ## 独立构建与测试
 
-前置：JDK 25（含 `java`、`javac`、`javap`）、Bash、Python 3.11+、Docker CLI/daemon、
+前置：JDK 25（含 `java`、`javac`、`javap`）、Node.js 24、npm 11、Bash、Python 3.11+、Docker CLI/daemon、
 `curl`、`unzip`、`shasum`，以及访问 Maven Central、Gradle 发布站点和私有 GHCR 的权限。
 使用现有 `docker login ghcr.io` 配置；不得把凭据写入脚本、参数日志或 Git。
 跨私有仓读取包需要实际包访问授权，仅声明 `packages: read` 不保证可读。
-本仓 Actions 使用 `github.token` 和 `packages: read`。维护者已配置宿主 GHCR package
+检查 workflow 使用 `github.token` 和 `packages: read` 读取宿主；独立发布 workflow 以
+`packages: write` 发布本仓自己的只含产物和报告的包。
+宿主 GHCR package
 的 Manage Actions access，授予本仓 Read；无需新增 PAT 或 repository secret。
 包访问必须以本仓 workflow 的实际下载日志核对；下载成功不能替代后续构建与测试通过。
 
@@ -130,6 +180,13 @@ bash scripts/prepare-host.sh
 bash scripts/gradle.sh clean check
 python3 scripts/test-gradle-launcher.py
 python3 scripts/test-build-gates.py
+python3 scripts/test-runtime-assets.py
+python3 scripts/test-package-release.py
+cd ui
+npx playwright install chromium
+npm run test:chromium
+npm run test:preferences:red
+node scripts/check-report.mjs
 ```
 
 `scripts/gradle.sh` 固定 Gradle 9.8.0，下载时校验正式分发 ZIP 的 SHA-256。
@@ -140,19 +197,20 @@ Java 版本与 Gradle 版本不是同一概念：本项目使用 Java 25、Gradl
 注解处理器固定为 `io.micronaut:micronaut-inject-java:4.10.33`，版本与正式宿主内
 micronaut-core、micronaut-inject、micronaut-core-processor 的 pom 一致，构建前检查。
 处理器关闭传递依赖，除该正式编译工具外，其处理依赖仍从同一正式宿主 jar 取得；
-只启用 `TypeElementVisitorProcessor` 生成 introspection，不引入另一套运行依赖。
+启用 `TypeElementVisitorProcessor` 和 `BeanDefinitionInjectProcessor`，分别生成触发器
+introspection 与 HTTP provider bean 索引，不引入另一套运行依赖。
 `gradle/verification-metadata.xml` 由标准 Gradle SHA-256 校验元数据命令生成，固定实际解析的
 处理器与既有测试依赖；宿主文件依赖仍由正式 digest/provenance 门核对。
 
 并行调查时可以将全部 Gradle 输出切到独占验证树，不改变 CI 默认 `build/` 路径：
 
 ```bash
-export AMIS_BUILD_DIR=.build
+export AMIS_BUILD_DIR=.work/independent-check
 bash scripts/gradle.sh clean check
 python3 scripts/test-build-gates.py
 ```
 
-设置该变量时，jar、JUnit 报告、插件 classpath 场景和负向门日志均写入 `.build/`。
+设置该变量时，jar、JUnit 报告、插件 classpath 场景和负向门日志均写入 `.work/independent-check/`。
 负向宿主 hash 测试使用独立测试配置，不再临时改写 `.integration/` 的正式 provenance。
 
 `prepare-host.sh` 只读取本仓 `host-contract.properties` 的固定正式镜像 digest。
@@ -169,8 +227,8 @@ python3 scripts/test-build-gates.py
   `imageLabelRevision`、`imageLabelSource`、`imageLabelTitle`、`imageLabelVersion`、
   `imageLabelCreated` 的原始镜像配置标签；`imageLabels` 保留原始标签值。
   这些标签可能继承自基础镜像，不能当作 overlay 源码提交证明。
-  当前正式 `91d6726d` 的 revision/source/title/version/created 标签来自上游 kestra-base，
-  `72d6031...` 不是本报告证明的 overlay commit。这不否定正式 digest 或提取产物的身份。
+  基础镜像标签可能指向上游 kestra-base；它们不是本报告证明的 overlay commit，
+  也不能替代正式 digest 或提取产物的身份。
   实际 overlay 提交必须由成功 CI 的 GitHub head 与绑定该 digest 的推广/attestation 链证明；
   本脚本的 `overlaySourceProvenance.status` 明确为 `not-verified-by-this-script`。
   标签字段回归可以本地运行 `python3 scripts/test-host-evidence.py`；这项专项回归不冒充已运行的 CI 检查。
@@ -224,6 +282,6 @@ BeanIntrospectionReference 索引及对应 class；禁止业务 BeanDefinitionRe
 
 本地领域测试不验证生产认证、原生路由优先、CSRF、两道授权、撤权、namespace file
 存储、Flow 保存/执行、队列副作用、AMIS 渲染、浏览器、编辑器或 Compose。
-基础提交的成功独立 CI 范围见前述记录；本轮模型尚无对应成功 CI、正式发布或根仓组合报告。
-不得把基础 CI 或本地模型测试当成本轮生产能力通过，不代表可部署的 P0 插件已发布。
+模型提交的成功独立 CI 范围见前述记录，不能作为本轮运行时的检查或部署证据。
+所选运行时必须对应成功检查、已完成的独立发布和根仓组合报告；缺任一必需门不得宣布阶段交付。
 完整阶段由主控核对独立仓发布与根仓真实组合证据后裁决。

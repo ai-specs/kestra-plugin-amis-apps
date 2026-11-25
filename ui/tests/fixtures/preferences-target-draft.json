@@ -1,0 +1,15 @@
+{
+  "status": "TARGET DRAFT — preparation tests only; NOT a published SDK descriptor or compatibility evidence",
+  "scope": "Explicit user target; never imported by production entry or copied into extracted host contract",
+  "descriptor": {
+    "version": 1,
+    "storage": "localStorage",
+    "theme": {
+      "key": "theme",
+      "default": "syncWithSystem",
+      "systemValue": "syncWithSystem",
+      "values": ["light", "dark", "dark-2", "syncWithSystem"]
+    },
+    "locale": {"key": "lang", "default": "en", "supported": ["en", "de", "es", "fr", "hi", "it", "ja", "ko", "pl", "pt", "pt_BR", "ru", "zh_CN"], "aliases": {"pt-BR": "pt_BR", "zh-CN": "zh_CN"}}
+  }
+}

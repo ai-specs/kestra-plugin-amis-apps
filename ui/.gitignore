@@ -1,0 +1,6 @@
+node_modules/
+dist/
+.host-sdk/
+reports/
+test-results/
+test-results-preferences-red/

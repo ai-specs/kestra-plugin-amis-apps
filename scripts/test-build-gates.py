@@ -43,6 +43,7 @@ def main():
          'Unexpected or missing Micronaut introspection registration'),
         ('unexpected-service', 'META-INF/services/example', 'Unexpected or missing service registration'),
         ('unexpected-resource', 'unexpected-resource.txt', 'Unexpected jar resource'),
+        ('unexpected-runtime-asset', 'META-INF/kestra/amis-apps/runtime/assets/unlisted.js', 'Packaged runtime differs from manifest whitelist'),
     ):
         try:
             with zipfile.ZipFile(artifact, 'a') as archive:
@@ -59,6 +60,12 @@ def main():
          None, 'Unexpected or missing Micronaut introspection registration'),
         ('damaged-introspection', 'io/kestra/plugin/amis/apps/$PageTrigger$Introspection.class', b'not a valid class',
          'Invalid introspection metadata or plugin discovery'),
+        ('missing-business-bean', 'META-INF/micronaut/io.micronaut.inject.BeanDefinitionReference/io.kestra.plugin.amis.apps.runtime.$AmisHttpRouteProvider$Definition',
+         None, 'Unexpected or missing Micronaut introspection registration'),
+        ('missing-runtime-manifest', 'META-INF/kestra/amis-apps/runtime/runtime-manifest.json',
+         None, 'Missing packaged runtime manifest'),
+        ('tampered-runtime-entry', 'META-INF/kestra/amis-apps/runtime/index.html', b'tampered HTML',
+         'Packaged runtime asset hash mismatch'),
     ):
         try:
             with zipfile.ZipFile(io.BytesIO(original)) as source, zipfile.ZipFile(artifact, 'w') as target:
@@ -73,12 +80,13 @@ def main():
             artifact.write_bytes(original)
     shutil.rmtree(fixture)
     (REPORT / 'result.json').write_text(json.dumps({
-        'passed': 10,
+        'passed': 14,
         'checks': ['host-hash-mismatch', 'third-party-class', 'nested-jar', 'unexpected-bean-index', 'unexpected-service', 'unexpected-resource',
-                   'missing-plugin-service', 'extra-plugin-provider', 'missing-introspection', 'damaged-introspection'],
+                   'missing-plugin-service', 'extra-plugin-provider', 'missing-introspection', 'damaged-introspection',
+                   'unexpected-runtime-asset', 'missing-business-bean', 'missing-runtime-manifest', 'tampered-runtime-entry'],
         'restored': True,
     }, indent=2) + '\n')
-    print('10 negative build gates passed; original artifact restored; formal host input unchanged')
+    print('14 negative build gates passed; original artifact restored; formal host input unchanged')
 
 
 if __name__ == '__main__':

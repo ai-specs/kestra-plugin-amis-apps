@@ -1,0 +1,10 @@
+:root { font-family: system-ui, sans-serif; background: var(--body-bg); color: var(--body-color); }
+body { margin: 0; background: var(--body-bg); color: var(--body-color); }
+header { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; padding: 1rem; border-bottom: 1px solid var(--borderColor); }
+header label { display: flex; gap: .5rem; align-items: center; }
+main { max-width: 64rem; margin: auto; padding: 1rem; }
+header select, main > button { font: inherit; background: var(--Form-input-bg); color: var(--Form-input-color); border: 1px solid var(--Form-input-borderColor); border-radius: .25rem; padding: .5rem; }
+header a, [role="alert"] a { color: inherit; text-decoration: underline; }
+:focus-visible { outline: 3px solid var(--primary) !important; outline-offset: 3px; }
+[role="alert"] { border: 1px solid var(--danger); padding: 1rem; color: var(--danger); margin-bottom: 1rem; }
+@media (max-width: 480px) { header { gap: .75rem; } main { padding: .75rem; } input { max-width: 100%; } }
