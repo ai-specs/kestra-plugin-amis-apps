@@ -35,6 +35,8 @@ def stage(destination):
     assert len(artifacts) == 1, 'Exactly one tested thin jar required'
     summary = json.loads((ROOT / 'ui/reports/summary.json').read_text())
     assert summary['acceptancePassed'] and not summary['failures'], 'Complete independent UI gate required'
+    for name in ['unit.xml', 'inputs.json', 'translations.json', 'chromium.json', 'preferences-red.json']:
+        assert (ROOT / 'ui/reports' / name).is_file(), 'Missing independent UI evidence: ' + name
     payload = destination / 'release'
     payload.mkdir(parents=True)
     shutil.copy2(artifacts[0], payload / 'kestra-amis-apps.jar')

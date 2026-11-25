@@ -6,9 +6,9 @@
   "scripts": {
     "prepare:sdk": "node scripts/extract-sdk.mjs",
     "build": "npm run prepare:sdk && vite build && node scripts/runtime-manifest.mjs && node scripts/evidence.mjs && node scripts/classpath-manifest.mjs",
-    "test": "node --test tests/*.test.mjs",
+    "test": "node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=reports/unit.xml tests/*.test.mjs",
     "test:chromium": "playwright test",
-    "test:translations": "node .host-sdk/check-translations.mjs src/locales",
+    "test:translations": "node scripts/translations.mjs",
     "test:preferences:red": "playwright test --config playwright.preferences.config.mjs",
     "preview": "vite preview --host 127.0.0.1 --port 4177"
   },

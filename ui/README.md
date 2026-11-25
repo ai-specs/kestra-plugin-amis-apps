@@ -35,6 +35,8 @@ npm audit --registry=https://registry.npmjs.org --json > reports/npm-audit.json
 ```
 
 Playwright 使用真实 Chromium 的 `channel: chromium`，不使用 Happy DOM。
+`npm test` 同时保留 `reports/unit.xml`，翻译检查自动生成 `reports/translations.json`；
+干净目录不依赖历史报告文件。检查器必须消费本次生成的文件，失败不得沿用旧的通过报告。
 `test:preferences:red` 现在是正式偏好回归门。旧 SDK 缺失 descriptor 时的两项红例保留在
 历史目录；正式 descriptor 接入后，当前门必须通过，不使用 skip/xfail。
 `check-report.mjs` 核对两份报告、截图和输入 hash；存在偏好失败时最终验收为红，退出码为 1。

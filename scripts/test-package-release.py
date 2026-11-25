@@ -43,6 +43,8 @@ class ReleasePackagingTest(unittest.TestCase):
         (self.root / 'build/reports/unit.txt').write_text('isolated test data\n')
         (self.root / 'build/test-results/results.xml').write_text('<testsuite tests="1"/>')
         (self.root / 'ui/reports/summary.json').write_text(json.dumps({'acceptancePassed': True, 'failures': []}))
+        for name in ['unit.xml', 'inputs.json', 'translations.json', 'chromium.json', 'preferences-red.json']:
+            (self.root / 'ui/reports' / name).write_text('isolated packaging test evidence\n')
         (self.root / '.integration/host-provenance.json').write_text(json.dumps({'image': 'formal-test-input'}))
 
     def git(self, *arguments):
