@@ -62,18 +62,20 @@ RBAC 提供统一权限策略，部署仓负责模式 A/B 的正式 Compose 验�
 跨私有仓读取包需要实际包访问授权，仅声明 `packages: read` 不保证可读。
 本仓 Actions 使用 `github.token` 和 `packages: read`。维护者已配置宿主 GHCR package
 的 Manage Actions access，授予本仓 Read；无需新增 PAT 或 repository secret。
-本次未运行远端 CI，因此此权限配置的成功下载仍须以本仓首次 workflow 日志核对。
+包访问必须以本仓 workflow 的实际下载日志核对；下载成功不能替代后续构建与测试通过。
 
 在本仓独立目录执行，不能依赖相邻源码：
 
 ```bash
 bash scripts/prepare-host.sh
 bash scripts/gradle.sh clean check
+python3 scripts/test-gradle-launcher.py
 python3 scripts/test-build-gates.py
 ```
 
 `scripts/gradle.sh` 固定 Gradle 9.8.0，下载时校验正式分发 ZIP 的 SHA-256。
-可以设置 `GRADLE_HOME` 指向已安装的同版本 Gradle；脚本核对版本，不下载替代版本。
+可以设置 `AMIS_GRADLE_HOME` 指向已安装的同版本 Gradle；脚本核对版本，不下载替代版本。
+runner 或 shell 预设的通用 `GRADLE_HOME` 不参与版本选择，避免继承其他项目的工具版本。
 Java 版本与 Gradle 版本不是同一概念：本项目使用 Java 25、Gradle 9.8.0。
 依赖版本由 `gradle.lockfile` 固定；维护者调整依赖时才执行 `--write-locks`。
 
@@ -102,7 +104,7 @@ Java 版本与 Gradle 版本不是同一概念：本项目使用 Java 25、Gradl
 没有宿主 CI、正式发布与组合报告时，不得宣布完整交付。
 
 独立 CI 为 `.github/workflows/foundation.yml`，与本地执行相同的 `prepare-host.sh`、
-`gradle.sh clean check` 和负向构建门。随后再次核对恢复后的输入与 jar。
+`gradle.sh clean check`、启动器回归和负向构建门。随后再次核对恢复后的输入与 jar。
 CI 不 checkout 相邻仓、不编译宿主、不运行容器或数据库。
 报告上传显式包含隐藏目录，失败时也保留已执行的报告；正式接收仍需实际下载 artifact，
 核对提交、测试零失败/跳过、镜像 digest 与 jar hash，不能仅看上传步骤成功。

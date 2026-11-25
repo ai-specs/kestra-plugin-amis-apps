@@ -28,6 +28,8 @@ jobs:
         run: bash scripts/prepare-host.sh
       - name: Run pure domain tests and thin jar gate
         run: bash scripts/gradle.sh clean check
+      - name: Verify pinned Gradle launcher ignores unrelated runner defaults
+        run: python3 scripts/test-gradle-launcher.py
       - name: Prove build gates reject invalid inputs
         run: python3 scripts/test-build-gates.py
       - name: Recheck restored inputs and artifact
