@@ -1,0 +1,7 @@
+/.work/
+/.integration/
+/.gradle/
+/build/
+/ui/node_modules/
+/.env
+/HANDOFF-NEXT-SESSION.md
