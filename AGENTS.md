@@ -9,6 +9,8 @@
 - 构建与 CI 只消费固定、已发布且成功 CI 的宿主镜像及公开产物，记录 digest 与 SHA-256。
 - 不读取相邻仓源码、patch、开发目录或未发布 jar，不触发其他仓构建或部署。
 - 宿主类型使用 compileOnly；jar 不包含宿主或第三方依赖类，必须验证生成的 bean 索引。
+- 维护依赖校验元数据时，必须在隔离的 `GRADLE_USER_HOME` 解析构建及测试依赖，覆盖
+  BOM 的 POM、Gradle module metadata 和 jar。保留严格校验；热缓存通过不能替代冷缓存复验。
 - 应用声明以 Flow storage 为唯一事实源，不建立应用或路由事实库。
 
 ## 安全与页面

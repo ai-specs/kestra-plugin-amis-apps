@@ -26,6 +26,8 @@ jobs:
           password: ${{ github.token }}
       - name: Extract fixed formal host without starting a container
         run: bash scripts/prepare-host.sh
+      - name: Verify platform POM and module checksums remain pinned
+        run: python3 scripts/test-dependency-metadata.py
       - name: Run pure domain tests and thin jar gate
         run: bash scripts/gradle.sh clean check
       - name: Verify pinned Gradle launcher ignores unrelated runner defaults
