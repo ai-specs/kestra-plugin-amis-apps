@@ -26,6 +26,22 @@ class PublishedHostContractTest {
     }
 
     @Test
+    void outputIdsMatchThePublishedOutputPatternWithoutInventingTaskNamingRules() throws Exception {
+        var field = Class.forName("io.kestra.core.models.flows.Output", false, getClass().getClassLoader()).getDeclaredField("id");
+        var pattern = field.getAnnotation(jakarta.validation.constraints.Pattern.class);
+        assertNotNull(pattern);
+        for (String value : Arrays.asList(null, "", "response", "business.response", "a..b", "a.", "1output", "a_b-c",
+            "_response", "../response", "a/b", "a\\b", "%2e", "a b", "a?b", "a#b", "é", "a".repeat(151))) {
+            boolean expected = value != null && java.util.regex.Pattern.matches(pattern.regexp(), value);
+            if (expected) {
+                assertEquals(value, Identifiers.outputId(value));
+            } else {
+                assertThrows(IllegalArgumentException.class, () -> Identifiers.outputId(value));
+            }
+        }
+    }
+
+    @Test
     void jacksonLoadedOnlyFromThePublishedHostArtifact() throws Exception {
         for (Class<?> type : List.of(com.fasterxml.jackson.databind.ObjectMapper.class,
             com.fasterxml.jackson.core.JsonFactory.class, com.fasterxml.jackson.annotation.JsonProperty.class)) {

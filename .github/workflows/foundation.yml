@@ -30,6 +30,10 @@ jobs:
         run: bash scripts/gradle.sh clean check
       - name: Verify pinned Gradle launcher ignores unrelated runner defaults
         run: python3 scripts/test-gradle-launcher.py
+      - name: Verify inherited image labels cannot claim the overlay source commit
+        run: |
+          mkdir -p .work/host-evidence-tests
+          python3 scripts/test-host-evidence.py > .work/host-evidence-tests/results.log 2>&1
       - name: Prove build gates reject invalid inputs
         run: python3 scripts/test-build-gates.py
       - name: Recheck restored inputs and artifact
@@ -49,3 +53,4 @@ jobs:
             .integration/host-public-types.txt
             .integration/host-flow-validation.txt
             .work/gate-tests/
+            .work/host-evidence-tests/

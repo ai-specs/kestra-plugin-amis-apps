@@ -1,4 +1,3 @@
-import java.security.MessageDigest
 import java.util.zip.ZipFile
 
 plugins { java }
@@ -9,8 +8,11 @@ version = "0.0.1-SNAPSHOT"
 repositories { mavenCentral() }
 dependencyLocking { lockAllConfigurations() }
 java { toolchain { languageVersion.set(JavaLanguageVersion.of(25)) } }
+layout.buildDirectory.set(layout.projectDirectory.dir(providers.environmentVariable("AMIS_BUILD_DIR").orElse("build").get()))
 
 dependencies {
+    annotationProcessor("io.micronaut:micronaut-inject-java:4.10.33") { isTransitive = false }
+    annotationProcessor(files(".integration/host-webserver.jar"))
     compileOnly(files(".integration/host-webserver.jar"))
     testImplementation(files(".integration/host-webserver.jar"))
     testImplementation(platform("org.junit:junit-bom:5.12.2"))
@@ -20,36 +22,40 @@ dependencies {
 
 val verifyHost = tasks.register<Exec>("verifyHost") {
     commandLine("python3", "scripts/host-evidence.py", "verify")
+    doLast {
+        ZipFile(file(".integration/host-webserver.jar")).use { archive ->
+            for (component in listOf("micronaut-core", "micronaut-inject", "micronaut-core-processor")) {
+                val descriptor = archive.getInputStream(archive.getEntry("META-INF/maven/io.micronaut/$component/pom.xml"))
+                    .bufferedReader().use { it.readText() }
+                check(descriptor.contains("<version>4.10.33</version>")) { "Annotation processor differs from formal host: $component" }
+            }
+        }
+    }
 }
-tasks.compileJava { dependsOn(verifyHost) }
+tasks.compileJava {
+    dependsOn(verifyHost)
+    options.compilerArgs.addAll(listOf("-processor", "io.micronaut.annotation.processing.TypeElementVisitorProcessor"))
+}
 
-tasks.test { useJUnitPlatform() }
+tasks.test {
+    useJUnitPlatform()
+    dependsOn(tasks.jar)
+    systemProperty("amis.hostJar", file(".integration/host-webserver.jar").absolutePath)
+    systemProperty("amis.pluginJar", tasks.jar.get().archiveFile.get().asFile.absolutePath)
+    systemProperty("amis.testClasses", sourceSets.test.get().output.classesDirs.asPath)
+    systemProperty("amis.contractReports", layout.buildDirectory.dir("reports/plugin-contract").get().asFile.absolutePath)
+}
 tasks.jar {
     isPreserveFileTimestamps = false
     isReproducibleFileOrder = true
 }
 
-val verifyThinJar = tasks.register("verifyThinJar") {
-    dependsOn(tasks.jar)
-    doLast {
-        val artifact = tasks.jar.get().archiveFile.get().asFile
-        ZipFile(artifact).use { archive ->
-            val entries = archive.entries().asSequence().map { it.name }.toList()
-            check(entries.any { it.endsWith(".class") }) { "Empty jar" }
-            check(entries.filter { it.endsWith(".class") }.all {
-                it.startsWith("io/kestra/plugin/amis/apps/domain/")
-            }) { "Host or third-party classes in thin jar" }
-            check(entries.none { it.endsWith(".jar") }) { "Nested dependency jar" }
-            check(entries.none { it.startsWith("META-INF/micronaut/") || it.startsWith("META-INF/services/") }) {
-                "Foundation must not register runtime beans or services"
-            }
-        }
-        val hash = MessageDigest.getInstance("SHA-256").digest(artifact.readBytes())
-            .joinToString("") { "%02x".format(it) }
-        val report = layout.buildDirectory.file("reports/thin-jar.txt").get().asFile
-        report.parentFile.mkdirs()
-        report.writeText("artifact=${artifact.name}\nsha256=$hash\nclasses=domain-only\nbeans=none\n")
-        logger.lifecycle(report.readText())
-    }
+val verifyThinJar = tasks.register<Exec>("verifyThinJar") {
+    dependsOn(tasks.jar, tasks.testClasses)
+    commandLine("python3", "scripts/verify-thin-jar.py",
+        tasks.jar.get().archiveFile.get().asFile.absolutePath,
+        file(".integration/host-webserver.jar").absolutePath,
+        sourceSets.test.get().output.classesDirs.asPath,
+        layout.buildDirectory.dir("reports").get().asFile.absolutePath)
 }
 tasks.check { dependsOn(verifyThinJar) }

@@ -20,6 +20,23 @@ def sha256(path):
         return hashlib.file_digest(stream, 'sha256').hexdigest()
 
 
+def image_label_evidence(inspection):
+    labels = dict((inspection.get('Config') or {}).get('Labels') or {})
+    return {
+        'imageLabelRevision': labels.get('org.opencontainers.image.revision'),
+        'imageLabelSource': labels.get('org.opencontainers.image.source'),
+        'imageLabelTitle': labels.get('org.opencontainers.image.title'),
+        'imageLabelVersion': labels.get('org.opencontainers.image.version'),
+        'imageLabelCreated': labels.get('org.opencontainers.image.created'),
+        'imageLabels': labels,
+        'imageLabelScope': 'Raw image configuration labels; may be inherited from the base image; not overlay source commit evidence',
+        'overlaySourceProvenance': {
+            'status': 'not-verified-by-this-script',
+            'requiredEvidence': 'Successful GitHub CI head and promotion/attestation chain binding the overlay source commit to the formal image digest',
+        },
+    }
+
+
 def prepare(area):
     artifact = area / 'host-webserver.jar'
     inspection = json.loads((area / 'image-inspect.json').read_text())
@@ -50,7 +67,7 @@ def prepare(area):
         'image': IMAGE,
         'imageId': inspection['Id'],
         'platform': inspection['Os'] + '/' + inspection['Architecture'],
-        'revision': inspection.get('Config', {}).get('Labels', {}).get('org.opencontainers.image.revision'),
+        **image_label_evidence(inspection),
         'artifactPath': '/app/kestra',
         'sha256': sha256(artifact),
         'publicTypes': list(TYPES),
@@ -62,8 +79,8 @@ def prepare(area):
     (area / 'host-provenance.json').write_text(json.dumps(provenance, indent=2) + '\n')
 
 
-def verify():
-    area = ROOT / '.integration'
+def verify(area=None):
+    area = ROOT / '.integration' if area is None else area
     provenance = json.loads((area / 'host-provenance.json').read_text())
     if provenance['image'] != IMAGE or provenance['sha256'] != sha256(area / 'host-webserver.jar'):
         raise ValueError('Host input differs from fixed provenance')
@@ -75,8 +92,8 @@ def verify():
 
 
 if __name__ == '__main__':
-    if sys.argv[1:] == ['verify']:
-        verify()
+    if len(sys.argv) in (2, 3) and sys.argv[1] == 'verify':
+        verify(None if len(sys.argv) == 2 else Path(sys.argv[2]))
     elif len(sys.argv) == 3 and sys.argv[1] == 'prepare':
         prepare(Path(sys.argv[2]))
     else:
