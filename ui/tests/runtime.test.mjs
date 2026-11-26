@@ -7,6 +7,17 @@ const api = new URL(`${config.apiBase}save`, origin);
 const ready = {status: 0, resultReady: true, executionId: 'exec-1', executionState: 'SUCCESS', data: {saved: 'hello'}};
 const pending = {...ready, resultReady: false, executionState: 'RUNNING', executionUrl: `${api.pathname}/executions/exec-1`, data: {}};
 const response = (body, status = 200) => new Response(JSON.stringify(body), {status, headers: {'Content-Type': 'application/json'}});
+function virtualTimeouts(context) {
+  context.mock.timers.enable({apis: ['setTimeout']});
+  const budgets = [];
+  context.mock.method(AbortSignal, 'timeout', milliseconds => {
+    budgets.push(milliseconds);
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(new DOMException('Request timed out', 'TimeoutError')), milliseconds);
+    return controller.signal;
+  });
+  return budgets;
+}
 
 test('bootstrap V1 and safe namespace accepted', () => assert.equal(parseBootstrap(config, origin), config));
 test('custom page identifier permits leading underscore', () => assert.equal(parseBootstrap({...config, pageId: '_home', schemaUrl: '/company._team/example.app/schemas/_home'}, origin).pageId, '_home'));
@@ -19,10 +30,16 @@ for (const raw of ['https://evil.test/path', '//evil.test/path', '/%2e/path', '/
 for (const raw of ['https://evil.test/poll', '/api/v1/main/executions/exec-1', `${api.pathname}/executions/other`, '/company._team/other/apis/save/executions/exec-1']) {
   test(`reject polling identity ${raw}`, () => assert.throws(() => validateExecutionUrl(raw, api, 'exec-1', origin)));
 }
-test('poll uses initial URL and sends exact JSON with CSRF', async () => {
+test('poll uses initial URL and sends exact JSON with CSRF', async context => {
+  const budgets = virtualTimeouts(context);
   const calls = [];
   const transport = createTransport(config, {origin, csrf: 'test-csrf', signal: new AbortController().signal, fetchImpl: async (url, options) => {calls.push({url, ...options}); return calls.length === 1 ? response(pending, 202) : response(ready);}});
-  assert.deepEqual((await transport.fetcher({url: api.pathname, method: 'post', data: {name: 'hello'}})).data, ready);
+  const result = transport.fetcher({url: api.pathname, method: 'post', data: {name: 'hello'}});
+  await new Promise(setImmediate);
+  assert.equal(calls.length, 1);
+  context.mock.timers.tick(config.limits.pollIntervalMs);
+  assert.deepEqual((await result).data, ready);
+  assert.deepEqual(budgets, [config.limits.pollTimeoutMs, config.limits.requestTimeoutMs, config.limits.requestTimeoutMs]);
   assert.equal(calls.length, 2); assert.equal(calls[0].body, '{"name":"hello"}'); assert.equal(calls[0].headers['X-CSRF-TOKEN'], 'test-csrf');
   assert.equal(calls[1].url, `${origin}${pending.executionUrl}`); assert.equal(calls[1].method, 'GET'); assert.equal(calls[0].redirect, 'error');
 });
@@ -50,9 +67,23 @@ test('AbortSignal cancels wait without second request', async () => {
   const transport = createTransport({...config, limits: {...config.limits, pollIntervalMs: 100}}, {origin, csrf: 'csrf', signal: controller.signal, fetchImpl: async () => {calls++; controller.abort(); return response(pending, 202);}});
   await assert.rejects(transport.fetcher({url: api.pathname, method: 'post', data: {}})); assert.equal(calls, 1);
 });
-test('poll total wait is bounded', async () => {
-  const transport = createTransport(config, {origin, csrf: 'csrf', signal: new AbortController().signal, fetchImpl: async () => response(pending, 202)});
-  await assert.rejects(transport.fetcher({url: api.pathname, method: 'post', data: {}}), {name: 'TimeoutError'});
+test('poll total wait is bounded', async context => {
+  const budgets = virtualTimeouts(context);
+  let calls = 0;
+  let requestSignal;
+  const transport = createTransport({...config, limits: {...config.limits, pollIntervalMs: config.limits.pollTimeoutMs}}, {origin, csrf: 'csrf', signal: new AbortController().signal, fetchImpl: async (url, options) => {calls++; requestSignal = options.signal; return response(pending, 202);}});
+  const rejected = assert.rejects(transport.fetcher({url: api.pathname, method: 'post', data: {}}), {name: 'TimeoutError'});
+  await new Promise(setImmediate);
+  context.mock.timers.tick(config.limits.pollTimeoutMs - 1);
+  await new Promise(setImmediate);
+  assert.equal(calls, 1);
+  assert.equal(requestSignal.aborted, false);
+  context.mock.timers.tick(1);
+  await rejected;
+  assert.equal(calls, 1);
+  assert.equal(requestSignal.aborted, true);
+  assert.equal(requestSignal.reason.name, 'TimeoutError');
+  assert.deepEqual(budgets, [config.limits.pollTimeoutMs, config.limits.requestTimeoutMs]);
 });
 test('AMIS config.cancelExecutor cancels polling', async () => {
   let cancel; let calls = 0;
