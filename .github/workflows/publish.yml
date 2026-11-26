@@ -24,7 +24,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           SOURCE_RUN_ID: ${{ github.event.workflow_run.id }}
           SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
-        run: gh run download "$SOURCE_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "amis-foundation-$SOURCE_SHA" --dir .
+        run: |
+          test ! -e .work/source-ci-artifact
+          gh run download "$SOURCE_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "amis-foundation-$SOURCE_SHA" --dir .work/source-ci-artifact
+          python3 scripts/restore-ci-artifact.py . .work/source-ci-artifact
       - name: Stage exact tested bytes and completed source CI proof
         run: python3 scripts/package-release.py .work/release-image
       - uses: docker/setup-buildx-action@v3

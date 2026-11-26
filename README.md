@@ -156,7 +156,8 @@ schema 可以读取当前或父级文件，不另加文件级授权；编辑管�
 ### 独立产物与报告发布
 
 push CI 上传 GitHub Actions artifact。独立发布 workflow 只在该源 CI 已经 completed/success
-后下载其原始 artifact，不重新编译，再发布仅包含 jar、报告和 source snapshot 的
+后下载其原始 artifact 到全新 `.work/source-ci-artifact`，核对 tracked 示例与矩阵字节且不覆盖源码，
+仅恢复打包所需生成报告和产物，不重新编译，再发布仅包含 jar、报告和 source snapshot 的
 `ghcr.io/ai-specs/kestra-plugin-amis-apps-artifact:<commit>` 包。它不是可以启动的应用服务镜像。
 部署消费必须固定实际 digest，核对 `release/release-provenance.json` 中 commit、jar SHA-256、
 host 输入、已完成的 `sourceCi` 及报告，不能只信任可重用 tag。使用 `docker create` 时指定一个占位 command，

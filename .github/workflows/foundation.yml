@@ -37,6 +37,7 @@ jobs:
         run: |
           python3 scripts/test-runtime-assets.py
           python3 scripts/test-package-release.py
+          python3 scripts/test-restore-ci-artifact.py
       - name: Install pinned Chromium
         working-directory: ui
         run: npx playwright install --with-deps chromium
