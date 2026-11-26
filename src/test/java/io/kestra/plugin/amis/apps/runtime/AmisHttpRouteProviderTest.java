@@ -370,6 +370,27 @@ class AmisHttpRouteProviderTest {
         return request;
     }
 
+    @Test void schemaHttpDispatchUsesPublishedFlowReaderAndCurrentIdentity() {
+        var access = mock(PublishedFlowAccess.class);
+        var snapshot = snapshot(flow(false, false));
+        when(access.lookupAfterEntry("company.demo", "greeting-app")).thenReturn(snapshot);
+        when(access.withFlowExecutionPermission(any(), eq(snapshot), any())).thenAnswer(call -> invokeSupplier(call.getArgument(2)));
+        var invocation = mock(PublishedFlowInvocation.class);
+        when(invocation.finishRequest()).thenReturn(Mono.empty());
+        var files = mock(io.kestra.webserver.rbac.FlowNamespaceFileReaderV1.class);
+        var request = authenticated(HttpRequest.GET("/company.demo/greeting-app/schemas/home"));
+        var identity = request.getAttribute(io.micronaut.security.filters.SecurityFilter.AUTHENTICATION, Authentication.class).orElseThrow();
+        byte[] bytes = "{\"type\":\"page\",\"body\":[]}".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        when(files.read(same(identity), eq("main"), same(snapshot.flow()), eq("company.demo"), eq("/home.json"), eq(1_048_576)))
+            .thenReturn(Mono.just(Optional.of(new io.kestra.webserver.rbac.FlowNamespaceFileReaderV1.Content("company.demo", "/home.json", bytes))));
+        var provider = new AmisHttpRouteProvider(access, invocation, mock(PublishedExecutionResults.class),
+            new PublishedFlowSchemas(files), mock(RuntimeAssets.class), mock(PageDocument.class), 1);
+        var response = Mono.from(provider.handle(request, provider.match(HttpMethod.GET, request.getUri().getRawPath()).orElseThrow())).block();
+        assertEquals(HttpStatus.OK, response.getStatus());
+        verify(files).read(same(identity), eq("main"), same(snapshot.flow()), eq("company.demo"), eq("/home.json"), eq(1_048_576));
+        verifyNoMoreInteractions(files);
+    }
+
     private static PublishedFlowAccess.Snapshot snapshot(Flow flow) {
         return new PublishedFlowAccess.Snapshot(ProcessedFlow.of(io.kestra.core.services.FlowParsingService.toFlowWithSource(flow)),
             RouteDeclarations.from(flow));

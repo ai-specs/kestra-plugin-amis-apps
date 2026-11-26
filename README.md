@@ -102,8 +102,10 @@ triggers:
   路径本身不携带 namespace；例如路径中的 `other` 只是当前 namespace 的目录，
   不能指定兄弟 namespace。候选由 `company.team.app`、`company.team`、`company`
   按顺序组成，路径不变，没有空 namespace、兄弟或无关 namespace 候选。
-  `SchemaResolver` 只在文件不存在时尝试下一候选；当前文件非法或读取异常不得静默
-  改用父级文件。`PublishedNamespaceFiles` 消费正式 NamespaceFactory，不新增运行文件授权。
+  `AsyncSchemaResolver` 只在文件不存在时尝试下一候选；当前文件非法或读取异常不得静默
+  改用父级文件。生产接线通过宿主公开 `FlowNamespaceFileReaderV1` 读取单个文件，
+  每次读取保留当前请求身份、承载 Flow 及 READ/EXECUTE 授权，不另加文件管理权限。
+  读取、父级回溯和取消沿同一异步链传播；原生文件管理 API 仍独立检查其管理权限。
 - JSON 必须为严格 UTF-8，大小为 1 至 1,048,576 字节，最大容器嵌套深度 64
   （根对象计一层）。根必须是对象且 `type` 等于字符串 `page`。
   重复 JSON key、尾随 JSON、注释、非法编码和超限输入拒绝。

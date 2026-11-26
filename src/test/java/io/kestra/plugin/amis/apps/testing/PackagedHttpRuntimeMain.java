@@ -10,7 +10,7 @@ import io.kestra.core.services.ConditionService;
 import io.kestra.core.services.ExecutionOutputService;
 import io.kestra.core.services.FlowService;
 import io.kestra.core.services.WebhookService;
-import io.kestra.core.storages.NamespaceFactory;
+import io.kestra.webserver.rbac.FlowNamespaceFileReaderV1;
 import io.kestra.core.tenant.TenantService;
 import io.kestra.plugin.amis.apps.runtime.AmisHttpRouteProvider;
 import io.kestra.webserver.rbac.HttpExtensionRouteProviderV1;
@@ -138,7 +138,7 @@ public final class PackagedHttpRuntimeMain {
             registerSingleton(WebhookService.class, Mockito.mock(WebhookService.class));
             registerSingleton(ExecutionRepositoryInterface.class, Mockito.mock(ExecutionRepositoryInterface.class));
             registerSingleton(ExecutionOutputService.class, Mockito.mock(ExecutionOutputService.class));
-            registerSingleton(NamespaceFactory.class, Mockito.mock(NamespaceFactory.class));
+            registerSingleton(FlowNamespaceFileReaderV1.class, Mockito.mock(FlowNamespaceFileReaderV1.class));
             registerSingleton(CsrfConfiguration.class, Mockito.mock(CsrfConfiguration.class));
             CsrfTokenGenerator<HttpRequest<Object>> generator = new CsrfTokenGenerator<HttpRequest<Object>>() {
                 @Override public String generateCsrfToken(HttpRequest<Object> request) { return "test-csrf"; }

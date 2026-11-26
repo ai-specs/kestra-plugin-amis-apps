@@ -14,6 +14,8 @@ TYPES = (
     'io.kestra.webserver.oidc.TrustedIdentityV2',
     'io.kestra.webserver.rbac.HttpExtensionRouteProviderV1',
     'io.kestra.webserver.rbac.HttpExtensionRouteProviderV1$Target',
+    'io.kestra.webserver.rbac.FlowNamespaceFileReaderV1',
+    'io.kestra.webserver.rbac.FlowNamespaceFileReaderV1$Content',
 )
 
 

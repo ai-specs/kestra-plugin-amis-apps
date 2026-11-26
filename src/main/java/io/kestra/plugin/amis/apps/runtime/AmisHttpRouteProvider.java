@@ -11,7 +11,7 @@ import io.kestra.core.services.ConditionService;
 import io.kestra.core.services.ExecutionOutputService;
 import io.kestra.core.services.FlowService;
 import io.kestra.core.services.WebhookService;
-import io.kestra.core.storages.NamespaceFactory;
+import io.kestra.webserver.rbac.FlowNamespaceFileReaderV1;
 import io.kestra.core.tenant.TenantService;
 import io.kestra.plugin.amis.apps.domain.ApiConfiguration;
 import io.kestra.plugin.amis.apps.domain.Identifiers;
@@ -52,7 +52,7 @@ public final class AmisHttpRouteProvider implements HttpExtensionRouteProviderV1
     private final PublishedFlowAccess access;
     private final PublishedFlowInvocation invocation;
     private final PublishedExecutionResults results;
-    private final SchemaResolver schemas;
+    private final SchemaLookup schemas;
     private final RuntimeAssets assets;
     private final PageDocument documents;
     private final JsonInputParser parser = new JsonInputParser(1_048_576, 64);
@@ -64,7 +64,7 @@ public final class AmisHttpRouteProvider implements HttpExtensionRouteProviderV1
     public AmisHttpRouteProvider(FlowRepositoryInterface flows, FlowMetaStoreInterface metadata, TenantService tenants,
         RbacConfiguration configuration, RbacGate gate, RbacExecutionGate executionGate, FlowInputOutput inputs,
         FlowService flowService, ConditionService conditions, WebhookService webhooks,
-        ExecutionRepositoryInterface executions, ExecutionOutputService outputService, NamespaceFactory namespaces,
+        ExecutionRepositoryInterface executions, ExecutionOutputService outputService, FlowNamespaceFileReaderV1 namespaceFiles,
         CsrfConfiguration csrf, CsrfTokenGenerator<HttpRequest<?>> generator, CsrfTokenValidator<HttpRequest<?>> validator,
         @Value("${kestra.amis-apps.max-sync-concurrency:4}") int maxSyncConcurrency,
         @Value("${kestra.amis-apps.request-body-timeout:PT30S}") Duration bodyReadTimeout) {
@@ -73,7 +73,7 @@ public final class AmisHttpRouteProvider implements HttpExtensionRouteProviderV1
         this.results = new PublishedExecutionResults(access, executions, outputService::getOutputs, configuration, gate);
         this.assets = new RuntimeAssets();
         this.documents = new PageDocument(assets, csrf, generator, validator);
-        this.schemas = new SchemaResolver(new PublishedNamespaceFiles(namespaces, access.storageTenant()), 1_048_576, 64);
+        this.schemas = new PublishedFlowSchemas(namespaceFiles)::resolve;
         this.syncCapacity = new Semaphore(new RuntimeLimits(maxSyncConcurrency).maxSyncConcurrency());
         this.bodyReadTimeout = checkedBodyTimeout(bodyReadTimeout);
     }
@@ -88,11 +88,30 @@ public final class AmisHttpRouteProvider implements HttpExtensionRouteProviderV1
         this.access = Objects.requireNonNull(access);
         this.invocation = Objects.requireNonNull(invocation);
         this.results = Objects.requireNonNull(results);
-        this.schemas = Objects.requireNonNull(schemas);
+        Objects.requireNonNull(schemas);
+        this.schemas = (identity, snapshot, namespace, uri) -> Mono.fromCallable(() -> schemas.resolve(namespace, uri));
         this.assets = Objects.requireNonNull(assets);
         this.documents = Objects.requireNonNull(documents);
         this.syncCapacity = new Semaphore(new RuntimeLimits(maxSyncConcurrency).maxSyncConcurrency());
         this.bodyReadTimeout = checkedBodyTimeout(bodyReadTimeout);
+    }
+
+    AmisHttpRouteProvider(PublishedFlowAccess access, PublishedFlowInvocation invocation, PublishedExecutionResults results,
+        PublishedFlowSchemas schemas, RuntimeAssets assets, PageDocument documents, int maxSyncConcurrency) {
+        this.access = Objects.requireNonNull(access);
+        this.invocation = Objects.requireNonNull(invocation);
+        this.results = Objects.requireNonNull(results);
+        this.schemas = Objects.requireNonNull(schemas)::resolve;
+        this.assets = Objects.requireNonNull(assets);
+        this.documents = Objects.requireNonNull(documents);
+        this.syncCapacity = new Semaphore(new RuntimeLimits(maxSyncConcurrency).maxSyncConcurrency());
+        this.bodyReadTimeout = Duration.ofSeconds(30);
+    }
+
+    @FunctionalInterface
+    private interface SchemaLookup {
+        Mono<Optional<SchemaResolver.ResolvedSchema>> resolve(Authentication identity,
+            PublishedFlowAccess.Snapshot snapshot, String namespace, String uri);
     }
 
     @Override public String id() { return "amis-apps"; }
@@ -132,11 +151,9 @@ public final class AmisHttpRouteProvider implements HttpExtensionRouteProviderV1
             }
             case "schemas" -> {
                 var page = requirePage(snapshot, route.item());
-                yield AuthorizationEvaluationContext.call(() -> {
-                    var schema = schemas.resolve(route.namespace(), "nsfile://" + page.schema().path())
-                        .orElseThrow(() -> failure(HttpStatus.NOT_FOUND));
-                    return HttpResponse.ok(schema.schema()).contentType("application/json");
-                });
+                yield schemas.resolve(identity, snapshot, route.namespace(), "nsfile://" + page.schema().path())
+                    .map(schema -> HttpResponse.ok(schema.orElseThrow(() -> failure(HttpStatus.NOT_FOUND)).schema())
+                        .contentType("application/json"));
             }
             case "assets" -> {
                 if (snapshot.declarations().pages().isEmpty()

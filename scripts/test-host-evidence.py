@@ -10,6 +10,11 @@ SPEC.loader.exec_module(HOST_EVIDENCE)
 
 
 class ImageLabelEvidenceTest(unittest.TestCase):
+    def test_flow_file_reader_public_inventory_requires_content_type(self):
+        self.assertIn('io.kestra.webserver.rbac.FlowNamespaceFileReaderV1', HOST_EVIDENCE.TYPES)
+        self.assertIn('io.kestra.webserver.rbac.FlowNamespaceFileReaderV1$Content', HOST_EVIDENCE.TYPES)
+        self.assertEqual(len(HOST_EVIDENCE.TYPES), len(set(HOST_EVIDENCE.TYPES)))
+
     def test_raw_labels_have_explicit_names_without_an_overlay_commit_claim(self):
         labels = {
             'org.opencontainers.image.revision': 'base-revision',
