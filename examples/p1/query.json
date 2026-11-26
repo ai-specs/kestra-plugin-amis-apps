@@ -1,0 +1,29 @@
+{
+  "type": "page",
+  "title": "P1 business application",
+  "body": {
+    "type": "crud",
+    "syncLocation": false,
+    "perPage": 2,
+    "api": {
+      "method": "post",
+      "url": "run",
+      "data": {
+        "action": "query",
+        "page": "${page}",
+        "perPage": "${perPage}"
+      }
+    },
+    "columns": [
+      {
+        "name": "name",
+        "label": "Business item"
+      }
+    ],
+    "headerToolbar": [],
+    "footerToolbar": [
+      "pagination"
+    ],
+    "placeholder": "No business records"
+  }
+}

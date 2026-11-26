@@ -1,0 +1,32 @@
+{
+  "type": "page",
+  "title": "P1 business application",
+  "body": {
+    "type": "form",
+    "body": [
+      {
+        "type": "switch",
+        "name": "load",
+        "label": "Load records"
+      },
+      {
+        "type": "service",
+        "visibleOn": "${load}",
+        "initFetchOn": "${load}",
+        "api": {
+          "method": "post",
+          "url": "run",
+          "data": {
+            "action": "conditional",
+            "name": "CONDITIONAL-LOADED"
+          }
+        },
+        "body": {
+          "type": "tpl",
+          "tpl": "Conditional: ${message}"
+        }
+      }
+    ],
+    "actions": []
+  }
+}

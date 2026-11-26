@@ -1,0 +1,103 @@
+{
+  "type": "page",
+  "title": "P1 business application",
+  "body": {
+    "type": "form",
+    "title": "P1 form",
+    "api": "post:run",
+    "body": [
+      {
+        "type": "select",
+        "name": "action",
+        "label": "Scenario",
+        "value": "save",
+        "options": [
+          {
+            "label": "save",
+            "value": "save"
+          },
+          {
+            "label": "slow",
+            "value": "slow"
+          },
+          {
+            "label": "fail",
+            "value": "fail"
+          },
+          {
+            "label": "pause",
+            "value": "pause"
+          }
+        ]
+      },
+      {
+        "type": "input-text",
+        "name": "name",
+        "label": "Name",
+        "required": true
+      },
+      {
+        "type": "tpl",
+        "tpl": "Saved: ${message}"
+      },
+      {
+        "type": "input-number",
+        "name": "quantity",
+        "label": "Quantity",
+        "value": 2
+      },
+      {
+        "type": "select",
+        "name": "category",
+        "label": "Category",
+        "options": [
+          {
+            "label": "Alpha",
+            "value": "alpha"
+          },
+          {
+            "label": "Beta",
+            "value": "beta"
+          }
+        ]
+      },
+      {
+        "type": "input-date",
+        "name": "date",
+        "label": "Date",
+        "format": "YYYY-MM-DD",
+        "inputFormat": "YYYY-MM-DD",
+        "value": "2026-11-27"
+      },
+      {
+        "type": "switch",
+        "name": "enabled",
+        "label": "Enabled",
+        "option": "Enable details"
+      },
+      {
+        "type": "input-text",
+        "name": "details",
+        "label": "Details",
+        "visibleOn": "${enabled}"
+      },
+      {
+        "type": "input-array",
+        "name": "tags",
+        "label": "Tags",
+        "items": {
+          "type": "input-text"
+        },
+        "value": [
+          "initial"
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "type": "submit",
+        "label": "Save changed data"
+      }
+    ]
+  }
+}

@@ -1,0 +1,114 @@
+{
+  "id": "p1-dialog",
+  "namespace": "company.p1",
+  "inputs": [
+    {
+      "id": "action",
+      "type": "STRING",
+      "defaults": "save"
+    },
+    {
+      "id": "name",
+      "type": "STRING",
+      "defaults": "P1"
+    },
+    {
+      "id": "quantity",
+      "type": "INT",
+      "defaults": 2
+    },
+    {
+      "id": "category",
+      "type": "STRING",
+      "defaults": "alpha"
+    },
+    {
+      "id": "date",
+      "type": "STRING",
+      "defaults": "2026-11-27"
+    },
+    {
+      "id": "enabled",
+      "type": "BOOL",
+      "defaults": false
+    },
+    {
+      "id": "details",
+      "type": "STRING",
+      "defaults": ""
+    },
+    {
+      "id": "tags",
+      "type": "ARRAY",
+      "itemType": "STRING",
+      "defaults": []
+    },
+    {
+      "id": "page",
+      "type": "INT",
+      "defaults": 1
+    },
+    {
+      "id": "perPage",
+      "type": "INT",
+      "defaults": 2
+    }
+  ],
+  "tasks": [
+    {
+      "id": "scenario",
+      "type": "io.kestra.plugin.core.flow.Switch",
+      "value": "{{ inputs.action }}",
+      "cases": {
+        "slow": [
+          {
+            "id": "wait",
+            "type": "io.kestra.plugin.core.flow.Sleep",
+            "duration": "PT8S"
+          }
+        ],
+        "fail": [
+          {
+            "id": "reject",
+            "type": "io.kestra.plugin.core.execution.Fail",
+            "errorMessage": "P1 intentional execution failure"
+          }
+        ],
+        "pause": [
+          {
+            "id": "pause",
+            "type": "io.kestra.plugin.core.flow.Pause",
+            "pauseDuration": "PT3S"
+          }
+        ]
+      },
+      "defaults": [
+        {
+          "id": "quick",
+          "type": "io.kestra.plugin.core.debug.Return",
+          "format": "P1 actual engine"
+        }
+      ]
+    }
+  ],
+  "outputs": [
+    {
+      "id": "response",
+      "type": "JSON",
+      "value": "{{ {\"action\": inputs.action, \"message\": inputs.name, \"quantity\": inputs.quantity, \"category\": inputs.category, \"date\": inputs.date, \"enabled\": inputs.enabled, \"details\": inputs.details, \"tags\": inputs.tags, \"items\": (inputs.action == 'query' and inputs.page == 1 ? fromJson('[{\"id\":1,\"name\":\"ROW-ONE\"},{\"id\":2,\"name\":\"ROW-TWO\"}]') : fromJson('[]')), \"total\": (inputs.action == 'query' ? 3 : 0)} | toJson }}"
+    }
+  ],
+  "triggers": [
+    {
+      "id": "page-home",
+      "type": "io.kestra.plugin.amis.apps.PageTrigger",
+      "pageId": "home",
+      "schema": "nsfile:///p1/dialog.json"
+    },
+    {
+      "id": "api-run",
+      "type": "io.kestra.plugin.amis.apps.ApiTrigger",
+      "apiId": "run"
+    }
+  ]
+}

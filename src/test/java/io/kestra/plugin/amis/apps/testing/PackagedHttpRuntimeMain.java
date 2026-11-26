@@ -71,7 +71,7 @@ public final class PackagedHttpRuntimeMain {
             require(provider.match(HttpMethod.GET, "/company.demo/greeting-app/pages/home").isPresent(), "page route missing");
             require(provider.match(HttpMethod.POST, "/company.demo/greeting-app/apis/greet").isPresent(), "API route missing");
             verifyAssets(report);
-            write(report, "disabled=false\nproviderCount=1\nproviderClass=" + provider.getClass().getName() + "\nassets=10\n");
+            write(report, "disabled=false\nproviderCount=1\nproviderClass=" + provider.getClass().getName() + "\nassets=12\n");
         }
     }
 
@@ -81,7 +81,7 @@ public final class PackagedHttpRuntimeMain {
             require(stream != null, "runtime manifest missing");
             var manifest = JacksonMapper.ofJson().readTree(stream);
             require(manifest.size() == 3 && manifest.path("version").intValue() == 1 && manifest.path("entry").asText().equals("index.html"), "runtime manifest header invalid");
-            require(manifest.path("assets").size() == 10 && !manifest.path("assets").has("runtime-manifest.json"), "runtime manifest asset count invalid");
+            require(manifest.path("assets").size() == 12 && !manifest.path("assets").has("runtime-manifest.json"), "runtime manifest asset count invalid");
             for (var entry = manifest.path("assets").fields(); entry.hasNext();) {
                 var descriptor = entry.next();
                 String path = descriptor.getKey();

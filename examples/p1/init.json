@@ -1,0 +1,16 @@
+{
+  "type": "page",
+  "title": "P1 business application",
+  "body": {
+    "type": "tpl",
+    "tpl": "Initial: ${message}"
+  },
+  "initApi": {
+    "method": "post",
+    "url": "run",
+    "data": {
+      "action": "init",
+      "name": "INITIAL-LOADED"
+    }
+  }
+}

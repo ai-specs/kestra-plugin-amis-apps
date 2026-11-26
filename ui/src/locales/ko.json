@@ -10,6 +10,12 @@
     "light": "Light",
     "dark": "Dark",
     "system": "System",
-    "error": "Unable to complete request"
+    "error": "Unable to complete request",
+    "paused": "Execution paused; waiting for resume…",
+    "recovery": "Existing execution",
+    "resume": "Resume result query",
+    "uncertain": "Submission outcome is unknown. Automatic retry is disabled.",
+    "forget": "Forget execution reference",
+    "forgetConfirm": "Forgetting does not cancel the execution. A later explicit submission may create another execution. Continue?"
   }
 }

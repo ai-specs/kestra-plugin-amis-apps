@@ -34,6 +34,6 @@ class PackagedHttpRuntimeTest {
             assertTrue(Files.exists(output.resolve("result.txt")));
         }
         assertTrue(Files.readString(report.resolve("disabled/result.txt")).contains("providerCount=0"));
-        assertTrue(Files.readString(report.resolve("enabled/result.txt")).contains("assets=10"));
+        assertTrue(Files.readString(report.resolve("enabled/result.txt")).contains("assets=12"));
     }
 }

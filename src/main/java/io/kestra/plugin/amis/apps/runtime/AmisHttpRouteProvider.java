@@ -59,6 +59,7 @@ public final class AmisHttpRouteProvider implements HttpExtensionRouteProviderV1
     private final ObjectMapper mapper = new ObjectMapper();
     private final Semaphore syncCapacity;
     private final Duration bodyReadTimeout;
+    private final long pollTimeoutMs;
 
     @Inject
     public AmisHttpRouteProvider(FlowRepositoryInterface flows, FlowMetaStoreInterface metadata, TenantService tenants,
@@ -67,7 +68,8 @@ public final class AmisHttpRouteProvider implements HttpExtensionRouteProviderV1
         ExecutionRepositoryInterface executions, ExecutionOutputService outputService, FlowNamespaceFileReaderV1 namespaceFiles,
         CsrfConfiguration csrf, CsrfTokenGenerator<HttpRequest<?>> generator, CsrfTokenValidator<HttpRequest<?>> validator,
         @Value("${kestra.amis-apps.max-sync-concurrency:4}") int maxSyncConcurrency,
-        @Value("${kestra.amis-apps.request-body-timeout:PT30S}") Duration bodyReadTimeout) {
+        @Value("${kestra.amis-apps.request-body-timeout:PT30S}") Duration bodyReadTimeout,
+        @Value("${kestra.amis-apps.poll-timeout:PT5M}") Duration pollTimeout) {
         this.access = new PublishedFlowAccess(flows, metadata, tenants, configuration, gate);
         this.invocation = new PublishedFlowInvocation(executionGate, inputs, flowService, conditions, webhooks);
         this.results = new PublishedExecutionResults(access, executions, outputService::getOutputs, configuration, gate);
@@ -76,6 +78,7 @@ public final class AmisHttpRouteProvider implements HttpExtensionRouteProviderV1
         this.schemas = new PublishedFlowSchemas(namespaceFiles)::resolve;
         this.syncCapacity = new Semaphore(new RuntimeLimits(maxSyncConcurrency).maxSyncConcurrency());
         this.bodyReadTimeout = checkedBodyTimeout(bodyReadTimeout);
+        this.pollTimeoutMs = checkedPollTimeout(pollTimeout);
     }
 
     AmisHttpRouteProvider(PublishedFlowAccess access, PublishedFlowInvocation invocation, PublishedExecutionResults results,
@@ -94,6 +97,7 @@ public final class AmisHttpRouteProvider implements HttpExtensionRouteProviderV1
         this.documents = Objects.requireNonNull(documents);
         this.syncCapacity = new Semaphore(new RuntimeLimits(maxSyncConcurrency).maxSyncConcurrency());
         this.bodyReadTimeout = checkedBodyTimeout(bodyReadTimeout);
+        this.pollTimeoutMs = checkedPollTimeout(Duration.ofMinutes(5));
     }
 
     AmisHttpRouteProvider(PublishedFlowAccess access, PublishedFlowInvocation invocation, PublishedExecutionResults results,
@@ -106,6 +110,7 @@ public final class AmisHttpRouteProvider implements HttpExtensionRouteProviderV1
         this.documents = Objects.requireNonNull(documents);
         this.syncCapacity = new Semaphore(new RuntimeLimits(maxSyncConcurrency).maxSyncConcurrency());
         this.bodyReadTimeout = Duration.ofSeconds(30);
+        this.pollTimeoutMs = checkedPollTimeout(Duration.ofMinutes(5));
     }
 
     @FunctionalInterface
@@ -146,7 +151,7 @@ public final class AmisHttpRouteProvider implements HttpExtensionRouteProviderV1
                 var bootstrap = Map.of("version", 1, "namespace", route.namespace(), "flowId", route.flowId(),
                     "pageId", route.item(), "schemaUrl", prefix + "/schemas/" + route.item(),
                     "apiBase", prefix + "/apis/", "assetBase", prefix + "/assets/",
-                    "limits", Map.of("requestTimeoutMs", 30000, "pollIntervalMs", 250, "pollTimeoutMs", 300000));
+                    "limits", Map.of("requestTimeoutMs", 30000, "pollIntervalMs", 250, "pollTimeoutMs", pollTimeoutMs));
                 yield Mono.fromCallable(() -> documents.response(request, prefix + "/", mapper.writeValueAsString(bootstrap)));
             }
             case "schemas" -> {
@@ -245,6 +250,14 @@ public final class AmisHttpRouteProvider implements HttpExtensionRouteProviderV1
     }
 
     private static HttpStatusException failure(HttpStatus status) { return new HttpStatusException(status, "AMIS request cannot be fulfilled"); }
+    static long checkedPollTimeout(Duration timeout) {
+        if (timeout == null || timeout.isNegative() || timeout.isZero()
+            || timeout.compareTo(Duration.ofMillis(1)) < 0 || timeout.compareTo(Duration.ofMinutes(5)) > 0) {
+            throw new IllegalArgumentException("Poll timeout must be at least 1 millisecond and at most 5 minutes");
+        }
+        return timeout.toMillis();
+    }
+
     private static Duration checkedBodyTimeout(Duration timeout) {
         if (timeout == null || timeout.isNegative() || timeout.isZero() || timeout.compareTo(Duration.ofSeconds(30)) > 0) {
             throw new IllegalArgumentException("Request body timeout must be positive and at most 30 seconds");

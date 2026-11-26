@@ -34,6 +34,10 @@ class ReleasePackagingTest(unittest.TestCase):
         (self.root / '.gitignore').write_text('/build/\n/.integration/\n/ui/reports/\n/.work/\n')
         (self.root / 'README.md').write_text('Test source snapshot\n')
         (self.root / 'host-contract.properties').write_text('overlay.image=formal-test-input\n')
+        (self.root / 'contracts').mkdir()
+        (self.root / 'contracts/p1-cases.json').write_text(json.dumps({'schemaVersion': 1, 'transport': ['P1 transport'], 'production': ['P1 production']}))
+        (self.root / 'examples/p1').mkdir(parents=True)
+        (self.root / 'examples/p1/scenarios.json').write_text('{"schemaVersion":1,"scenarios":[]}')
         self.git('add', '.')
         self.git('commit', '-qm', 'Test packaging source')
         self.commit = self.git('rev-parse', 'HEAD')
@@ -45,7 +49,28 @@ class ReleasePackagingTest(unittest.TestCase):
         (self.root / 'ui/reports/summary.json').write_text(json.dumps({'acceptancePassed': True, 'failures': []}))
         for name in ['unit.xml', 'inputs.json', 'translations.json', 'chromium.json', 'preferences-red.json']:
             (self.root / 'ui/reports' / name).write_text('isolated packaging test evidence\n')
-        (self.root / '.integration/host-provenance.json').write_text(json.dumps({'image': 'formal-test-input'}))
+        (self.root / '.integration/host-provenance.json').write_text(json.dumps({'image': 'formal-test-input', 'sha256': 'b' * 64}))
+
+        for kind in ['transport', 'production']:
+            evidence = self.root / 'ui/reports' / (kind + '-evidence.json')
+            evidence.write_text('public test evidence')
+            report = {'schemaVersion': 1, 'scope': 'test-transport' if kind == 'transport' else 'production-execution',
+                      'manifestSha256': release.sha256(self.root / 'contracts/p1-cases.json'),
+                      'sourceCommit': self.commit, 'sourceSha256': self.source_hash(),
+                      'hostImage': 'formal-test-input', 'hostExecutableSha256': 'b' * 64,
+                      'jarSha256': release.sha256(self.root / 'build/libs/test.jar') if kind == 'production' else None,
+                      'passed': True, 'stats': {'expected': 1, 'passed': 1, 'failed': 0, 'skipped': 0, 'notRun': 0},
+                      'cases': [{'id': 'P1 ' + kind, 'status': 'passed', 'evidence': [{'path': evidence.name, 'sha256': release.sha256(evidence)}]}]}
+            if kind == 'production':
+                boundary = {'sourceCommit': self.commit, 'sourceSha256': self.source_hash()}
+                report.update(sourceStable=True, sourceAtStart=boundary, sourceAtEnd=boundary)
+            (self.root / 'ui/reports' / ('p1-' + kind + '.json')).write_text(json.dumps(report))
+
+    def source_hash(self):
+        import hashlib
+        names = sorted(filter(None, subprocess.check_output(['git', 'ls-files', '--cached', '--others', '--exclude-standard', '-z'], cwd=self.root).decode().split('\0')))
+        files = {name: release.sha256(self.root / name) for name in names}
+        return hashlib.sha256(json.dumps(files, ensure_ascii=False, separators=(',', ':')).encode()).hexdigest()
 
     def git(self, *arguments):
         return subprocess.check_output(['git', *arguments], cwd=self.root, text=True).strip()
@@ -107,6 +132,57 @@ class ReleasePackagingTest(unittest.TestCase):
         self.assertEqual(proof['runId'], 12345)
         self.assertEqual(proof['headSha'], self.commit)
         self.assertEqual(proof['conclusion'], 'success')
+
+
+    def test_p1_missing_or_incomplete_production_report_rejected(self):
+        path = self.root / 'ui/reports/p1-production.json'
+        report = json.loads(path.read_text())
+        report['stats']['notRun'] = 1
+        path.write_text(json.dumps(report))
+        with self.assertRaisesRegex(AssertionError, 'incomplete matrix'):
+            release.stage(self.root / '.work/p1-incomplete')
+        path.unlink()
+        with self.assertRaises(FileNotFoundError):
+            release.stage(self.root / '.work/p1-missing')
+
+    def test_p1_case_identity_and_actual_execution_jar_rejected(self):
+        path = self.root / 'ui/reports/p1-production.json'
+        report = json.loads(path.read_text())
+        original_id = report['cases'][0]['id']
+        report['cases'][0]['id'] = 'invented passing test'
+        path.write_text(json.dumps(report))
+        with self.assertRaisesRegex(AssertionError, 'exact case IDs'):
+            release.stage(self.root / '.work/p1-wrong-id')
+        report['cases'][0]['id'] = original_id
+        report['jarSha256'] = '0' * 64
+        path.write_text(json.dumps(report))
+        with self.assertRaisesRegex(AssertionError, 'runtime jar'):
+            release.stage(self.root / '.work/p1-wrong-jar')
+
+    def test_p1_evidence_tampering_or_path_escape_rejected(self):
+        path = self.root / 'ui/reports/p1-production.json'
+        report = json.loads(path.read_text())
+        report['cases'][0]['evidence'][0]['sha256'] = '0' * 64
+        path.write_text(json.dumps(report))
+        with self.assertRaisesRegex(AssertionError, 'evidence hash'):
+            release.stage(self.root / '.work/p1-tampered')
+        report['cases'][0]['evidence'][0]['path'] = '../../README.md'
+        path.write_text(json.dumps(report))
+        with self.assertRaisesRegex(AssertionError, 'path escapes'):
+            release.stage(self.root / '.work/p1-escape')
+
+
+    def test_production_source_freeze_fields_are_required_and_exact(self):
+        path = self.root / 'ui/reports/p1-production.json'
+        original = json.loads(path.read_text())
+        for index, change in enumerate([
+            {'sourceStable': False}, {'sourceStable': None}, {'sourceAtStart': None},
+            {'sourceAtEnd': {'sourceCommit': self.commit, 'sourceSha256': '0' * 64}},
+            {'sourceAtStart': {'sourceCommit': '0' * 40, 'sourceSha256': self.source_hash()}}
+        ]):
+            path.write_text(json.dumps({**original, **change}))
+            with self.assertRaisesRegex(AssertionError, 'source (was not stable|boundary)'):
+                release.stage(self.root / ('.work/p1-source-' + str(index)))
 
 
 if __name__ == '__main__':

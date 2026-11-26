@@ -12,7 +12,7 @@ permissions:
 jobs:
   domain-and-thin-jar:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -46,6 +46,21 @@ jobs:
           npm run test:chromium
           npm run test:preferences:red
           node scripts/check-report.mjs
+      - name: Run the additional P1 real controls matrix
+        working-directory: ui
+        run: npm run test:p1
+      - name: Run P1 production login and actual Flow executions with one isolated PostgreSQL
+        run: |
+          node --input-type=module <<'JS'
+          import {readFileSync, writeFileSync} from 'node:fs';
+          import {resolve} from 'node:path';
+          import {createHash} from 'node:crypto';
+          const jar = resolve('build/libs/kestra-plugin-amis-apps-0.0.1-SNAPSHOT.jar');
+          writeFileSync('.work/p1-ci-options.json', JSON.stringify({schemaVersion: 1,
+            startIsolatedStack: true, directory: resolve('.work/p1-ci-production'),
+            port: 18671, jar, jarSha256: createHash('sha256').update(readFileSync(jar)).digest('hex')}), {mode: 0o600});
+          JS
+          node scripts/run-p1-production.mjs .work/p1-ci-options.json
       - name: Verify pinned Gradle launcher ignores unrelated runner defaults
         run: python3 scripts/test-gradle-launcher.py
       - name: Verify inherited image labels cannot claim the overlay source commit
@@ -71,6 +86,9 @@ jobs:
             ui/reports/
             ui/test-results/
             ui/test-results-preferences-red/
+            ui/test-results-p1/
+            examples/p1/
+            contracts/p1-cases.json
             .integration/host-public-types.txt
             .integration/host-flow-validation.txt
             .work/gate-tests/

@@ -1,7 +1,7 @@
-# P0 固定运行时：AMIS-UI-20261125
+# AMIS 固定运行时：AMIS-UI-20261125
 
-本目录独立构建 AMIS 6.13.0 运行时。只实现 P0 的页面、文本表单、提交和结果等待，
-不实现 P1 复杂控件、P3 编辑器、Java 入口或生产认证。测试 transport 不证明生产身份、
+本目录独立构建 AMIS 6.13.0 运行时。保留 P0 页面、文本表单、提交和结果等待，
+包含 P1 复杂控件、暂停提示与执行恢复的独立验收入口；P3 编辑器不在当前范围。测试 transport 不证明生产身份、
 RBAC、CSRF 服务端校验、Flow execution、队列或存储已经通过。不得把本地 UI 门当作 P0 整阶段交付。
 
 ## 正式输入与独立构建
@@ -60,7 +60,7 @@ Playwright 使用真实 Chromium 的 `channel: chromium`，不使用 Happy DOM�
 bootstrap 严格验证 version、namespace、flowId、pageId、schemaUrl、apiBase、assetBase。
 limits 全为正整数，上限为 requestTimeoutMs=30000、pollIntervalMs=10000、pollTimeoutMs=300000。
 页面 JSON 从 schemaUrl 成功加载后才交给真实 AMIS renderer，不生成替代表单。
-P0 注册 page、panel、form、input-text、control、tpl、action；其他控件不属于本次范围。
+P0 注册 page、panel、form、input-text、control、tpl、action；P1 另注册数字、选择、日期、开关、数组、Service、CRUD、Table、Pagination、Dialog 与 plain 字段。
 主题通过 AMIS 官方 cxd/dark API 注册、renderer 的 theme 属性和对应官方 CSS 切换。
 官方皮肤用 Vite inline CSS 处理本地资源引用，页面只启用一份官方皮肤；不自造深色调色板，
 不以 data-theme 属性代替实际原生 dark-* DOM 和计算颜色。自有 CSS 只桥接页面容器、
@@ -180,3 +180,10 @@ manifest 的 `assets.allowlist` 是构建后每个 `assets/` 文件的精确相�
 
 正式输入生成的 manifest 位于 `reports/page-document-manifest.json`，供 jar 打包与报告审计使用；
 它不修改 `build.gradle`、Java runtime 或根仓文件。
+
+
+新增 P1 控件矩阵执行 `npm run test:p1`，精确 20 项 ID 由仓库
+`contracts/p1-cases.json` 固定，报告为 `reports/p1-transport.json`。此报告仅证明真实
+Chromium 控件与协议。生产执行门由仓库 `scripts/run-p1-production.mjs` 独立启动，
+使用真实宿主、生产登录、Flow/schema 和执行持久化，报告为 `reports/p1-production.json`。
+正式 publisher 必须同时核对这两份报告及原有门；本目录的 transport 不能替代生产门。

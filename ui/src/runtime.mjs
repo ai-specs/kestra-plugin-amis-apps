@@ -53,7 +53,7 @@ function delay(milliseconds, signal) {
   });
 }
 
-export function createTransport(config, {origin, csrf, signal, fetchImpl = fetch, onError = () => {}, onState = () => {}}) {
+export function createTransport(config, {origin, csrf, signal, fetchImpl = fetch, onError = () => {}, onState = () => {}, onExecution = () => {}}) {
   async function request(url, options, outerSignal) {
     const timeout = AbortSignal.timeout(config.limits.requestTimeoutMs);
     const combined = AbortSignal.any([signal, timeout, ...(outerSignal ? [outerSignal] : [])]);
@@ -67,7 +67,7 @@ export function createTransport(config, {origin, csrf, signal, fetchImpl = fetch
     async schema() {
       return (await request(safeUrl(config.schemaUrl, origin), {method: 'GET'})).body;
     },
-    async fetcher({url: raw, method = 'get', data, signal: callerSignal, cancelExecutor, config: requestConfig = {}}) {
+    async fetcher({url: raw, method = 'get', data, signal: callerSignal, cancelExecutor, config: requestConfig = {}, resumeExecution}) {
       const controller = new AbortController();
       cancelExecutor?.(() => controller.abort());
       requestConfig.cancelExecutor?.(() => controller.abort());
@@ -77,26 +77,38 @@ export function createTransport(config, {origin, csrf, signal, fetchImpl = fetch
         const url = safeUrl(typeof raw === 'string' && customIdentifier.test(raw) ? `${base}${raw}` : raw, origin);
         const apiId = url.pathname.slice(base.length);
         if (method.toLowerCase() !== 'post' || !url.pathname.startsWith(base) || !customIdentifier.test(apiId)) throw new Error('Only same Flow POST API is allowed');
-        if (typeof csrf !== 'string' || !csrf.trim() || csrf.includes('__AMIS_') || /[\r\n]/.test(csrf)) throw new Error('Missing CSRF token');
-        if (!object(data)) throw new Error('API body must be a JSON object');
+        if (!resumeExecution && (typeof csrf !== 'string' || !csrf.trim() || csrf.includes('__AMIS_') || /[\r\n]/.test(csrf))) throw new Error('Missing CSRF token');
+        if (!resumeExecution && !object(data)) throw new Error('API body must be a JSON object');
         onState('waiting');
-        let result = await request(url, {method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf}, body: JSON.stringify(data)}, combined);
+        const recoveryUrl = resumeExecution && validateExecutionUrl(resumeExecution.executionUrl, url, resumeExecution.executionId, origin);
+        let result = recoveryUrl ? await request(recoveryUrl, {method: 'GET'}, combined) : await request(url, {method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf}, body: JSON.stringify(data)}, combined);
         const first = result.body;
-        let pollingUrl;
+        validateExecutionResponse(first, result.response.status);
+        if (resumeExecution && first.executionId !== resumeExecution.executionId) throw new Error('Execution identity changed');
+        let pollingUrl = recoveryUrl;
         if (result.response.status === 202 || first.resultReady === false) {
-          pollingUrl = validateExecutionUrl(first.executionUrl, url, first.executionId, origin);
+          pollingUrl = recoveryUrl || validateExecutionUrl(first.executionUrl, url, first.executionId, origin);
+          onExecution({apiUrl: url.pathname, executionId: first.executionId, executionUrl: pollingUrl.pathname});
         }
+        let wasPaused = false;
         while (true) {
           const body = result.body;
           validateExecutionResponse(body, result.response.status);
           if (pollingUrl && body.executionId !== first.executionId) throw new Error('Execution identity changed');
-          if (body.status !== 0 || failedStates.has(body.executionState)) throw new Error(`Execution failed (${body.executionState || body.status})`);
+          if (body.status !== 0 || failedStates.has(body.executionState)) {
+            if (terminalStates.has(body.executionState)) onExecution(null);
+            throw new Error(`Execution failed (${body.executionState || body.status})`);
+          }
           if (body.resultReady === true && result.response.status === 200) {
             if (!object(body.data)) throw new Error('Missing result data');
+            onExecution(null);
             onState('success');
             return {data: body};
           }
           if (!pollingUrl || result.response.status !== 202 || body.resultReady !== false) throw new Error('Result not ready');
+          const paused = ['PAUSED', 'BREAKPOINT'].includes(body.executionState);
+          if (paused !== wasPaused) onState(paused ? 'paused' : 'waiting');
+          wasPaused = paused;
           await delay(config.limits.pollIntervalMs, combined);
           result = await request(pollingUrl, {method: 'GET'}, combined);
         }

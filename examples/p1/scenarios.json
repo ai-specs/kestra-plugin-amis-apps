@@ -1,0 +1,124 @@
+{
+  "schemaVersion": 1,
+  "scenarios": [
+    {
+      "id": "p1-async",
+      "flow": "examples/p1/p1-async.yaml",
+      "schema": "examples/p1/controls.json",
+      "namespaceFile": "/p1/controls.json",
+      "namespace": "company.p1",
+      "flowId": "p1-async",
+      "pageId": "home",
+      "apiId": "run",
+      "resultOutput": "response",
+      "mode": "ASYNC"
+    },
+    {
+      "id": "p1-sync",
+      "flow": "examples/p1/p1-sync.yaml",
+      "schema": "examples/p1/controls.json",
+      "namespaceFile": "/p1/controls.json",
+      "namespace": "company.p1",
+      "flowId": "p1-sync",
+      "pageId": "home",
+      "apiId": "run",
+      "resultOutput": "response",
+      "mode": "SYNC",
+      "syncTimeout": "PT10S"
+    },
+    {
+      "id": "p1-sync-expiry",
+      "flow": "examples/p1/p1-sync-expiry.yaml",
+      "schema": "examples/p1/controls.json",
+      "namespaceFile": "/p1/controls.json",
+      "namespace": "company.p1",
+      "flowId": "p1-sync-expiry",
+      "pageId": "home",
+      "apiId": "run",
+      "resultOutput": "response",
+      "mode": "SYNC",
+      "syncTimeout": "PT0.25S"
+    },
+    {
+      "id": "p1-query",
+      "flow": "examples/p1/p1-query.yaml",
+      "schema": "examples/p1/query.json",
+      "namespaceFile": "/p1/query.json",
+      "namespace": "company.p1",
+      "flowId": "p1-query",
+      "pageId": "home",
+      "apiId": "run",
+      "resultOutput": "response",
+      "mode": "ASYNC"
+    },
+    {
+      "id": "p1-init",
+      "flow": "examples/p1/p1-init.yaml",
+      "schema": "examples/p1/init.json",
+      "namespaceFile": "/p1/init.json",
+      "namespace": "company.p1",
+      "flowId": "p1-init",
+      "pageId": "home",
+      "apiId": "run",
+      "resultOutput": "response",
+      "mode": "ASYNC"
+    },
+    {
+      "id": "p1-conditional",
+      "flow": "examples/p1/p1-conditional.yaml",
+      "schema": "examples/p1/conditional.json",
+      "namespaceFile": "/p1/conditional.json",
+      "namespace": "company.p1",
+      "flowId": "p1-conditional",
+      "pageId": "home",
+      "apiId": "run",
+      "resultOutput": "response",
+      "mode": "ASYNC"
+    },
+    {
+      "id": "p1-dialog",
+      "flow": "examples/p1/p1-dialog.yaml",
+      "schema": "examples/p1/dialog.json",
+      "namespaceFile": "/p1/dialog.json",
+      "namespace": "company.p1",
+      "flowId": "p1-dialog",
+      "pageId": "home",
+      "apiId": "run",
+      "resultOutput": "response",
+      "mode": "ASYNC"
+    }
+  ],
+  "actions": [
+    "save",
+    "slow",
+    "fail",
+    "pause",
+    "init",
+    "query",
+    "conditional"
+  ],
+  "fields": [
+    "action",
+    "name",
+    "quantity",
+    "category",
+    "date",
+    "enabled",
+    "details",
+    "tags",
+    "page",
+    "perPage"
+  ],
+  "resultFields": [
+    "action",
+    "message",
+    "quantity",
+    "category",
+    "date",
+    "enabled",
+    "details",
+    "tags",
+    "items",
+    "total"
+  ]
+}

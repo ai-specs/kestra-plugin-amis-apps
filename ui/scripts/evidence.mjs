@@ -14,7 +14,7 @@ async function inventory(directory, prefix = '') {
 }
 const source = {};
 for (const directory of ['src/', 'scripts/', 'tests/']) Object.assign(source, Object.fromEntries(Object.entries(await inventory(directory)).map(([name, digest]) => [`${directory}${name}`, digest])));
-for (const name of ['package.json', 'package-lock.json', 'index.html', 'vite.config.mjs', 'playwright.config.mjs', 'playwright.preferences.config.mjs', 'README.md', '.npmrc', '.gitignore']) source[name] = hash(await readFile(new URL(name, root)));
+for (const name of ['package.json', 'package-lock.json', 'index.html', 'vite.config.mjs', 'playwright.config.mjs', 'playwright.preferences.config.mjs', 'playwright.p1.config.mjs', 'README.md', '.npmrc', '.gitignore']) source[name] = hash(await readFile(new URL(name, root)));
 const assets = await inventory('dist/');
 for (const name of Object.keys(assets)) {
   if (/monaco|tinymce|froala|codemirror|amis-editor|editor\./i.test(name)) throw new Error(`Editor asset outside P0: ${name}`);

@@ -1,0 +1,36 @@
+{
+  "type": "page",
+  "title": "P1 business application",
+  "body": {
+    "type": "button",
+    "label": "Open form",
+    "actionType": "dialog",
+    "dialog": {
+      "title": "Business dialog",
+      "body": {
+        "type": "form",
+        "title": "P1 form",
+        "api": "post:run",
+        "body": [
+          {
+            "type": "input-text",
+            "name": "name",
+            "label": "Name",
+            "required": true
+          },
+          {
+            "type": "tpl",
+            "tpl": "Saved: ${message}"
+          }
+        ],
+        "actions": [
+          {
+            "type": "submit",
+            "label": "Save changed data"
+          }
+        ]
+      },
+      "closeOnConfirm": false
+    }
+  }
+}

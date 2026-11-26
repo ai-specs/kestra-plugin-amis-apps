@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "transport": [
+    "P1 TRANSPORT controls en light desktop",
+    "P1 TRANSPORT controls en light narrow",
+    "P1 TRANSPORT controls en dark desktop",
+    "P1 TRANSPORT controls en dark narrow",
+    "P1 TRANSPORT controls zh-CN light desktop",
+    "P1 TRANSPORT controls zh-CN light narrow",
+    "P1 TRANSPORT controls zh-CN dark desktop",
+    "P1 TRANSPORT controls zh-CN dark narrow",
+    "P1 TRANSPORT required validation prevents POST",
+    "P1 TRANSPORT conditional visibility and conditional POST",
+    "P1 TRANSPORT page init POST loads business data",
+    "P1 TRANSPORT CRUD POST pagination and empty result",
+    "P1 TRANSPORT dialog form saves changed data",
+    "P1 TRANSPORT paused keeps busy cancel and duplicate merge",
+    "P1 TRANSPORT double submission creates one POST",
+    "P1 TRANSPORT refresh resumes only original GET",
+    "P1 TRANSPORT leave and reenter resumes only original GET",
+    "P1 TRANSPORT lost submission response prevents implicit retry",
+    "P1 TRANSPORT HTTP error is visible without empty success",
+    "P1 TRANSPORT failed execution is visible"
+  ],
+  "production": [
+    "P1 PRODUCTION controls persist typed inputs",
+    "P1 PRODUCTION required validation creates zero execution",
+    "P1 PRODUCTION conditional POST and page init load",
+    "P1 PRODUCTION CRUD pagination and empty result",
+    "P1 PRODUCTION dialog saves changed field",
+    "P1 PRODUCTION default ASYNC running then success",
+    "P1 PRODUCTION ASYNC failure",
+    "P1 PRODUCTION ASYNC pause and resume",
+    "P1 PRODUCTION browser timeout resumes same execution",
+    "P1 PRODUCTION explicit SYNC success",
+    "P1 PRODUCTION explicit SYNC failure",
+    "P1 PRODUCTION SYNC expiry then GET same execution",
+    "P1 PRODUCTION duplicate submit one execution",
+    "P1 PRODUCTION refresh and reentry no implicit POST",
+    "P1 PRODUCTION lost POST response outcome unknown",
+    "P1 PRODUCTION rejected POST has zero side effects"
+  ],
+  "productionFlows": {
+    "P1 PRODUCTION controls persist typed inputs": {
+      "p1-async": 1
+    },
+    "P1 PRODUCTION required validation creates zero execution": {
+      "p1-async": 0
+    },
+    "P1 PRODUCTION conditional POST and page init load": {
+      "p1-init": 1,
+      "p1-conditional": 1
+    },
+    "P1 PRODUCTION CRUD pagination and empty result": {
+      "p1-query": 2
+    },
+    "P1 PRODUCTION dialog saves changed field": {
+      "p1-dialog": 1
+    },
+    "P1 PRODUCTION default ASYNC running then success": {
+      "p1-async": 1
+    },
+    "P1 PRODUCTION ASYNC failure": {
+      "p1-async": 1
+    },
+    "P1 PRODUCTION ASYNC pause and resume": {
+      "p1-async": 1
+    },
+    "P1 PRODUCTION browser timeout resumes same execution": {
+      "p1-async": 1
+    },
+    "P1 PRODUCTION explicit SYNC success": {
+      "p1-sync": 1
+    },
+    "P1 PRODUCTION explicit SYNC failure": {
+      "p1-sync": 1
+    },
+    "P1 PRODUCTION SYNC expiry then GET same execution": {
+      "p1-sync-expiry": 1
+    },
+    "P1 PRODUCTION duplicate submit one execution": {
+      "p1-async": 1
+    },
+    "P1 PRODUCTION refresh and reentry no implicit POST": {
+      "p1-async": 1
+    },
+    "P1 PRODUCTION lost POST response outcome unknown": {
+      "p1-async": 1
+    },
+    "P1 PRODUCTION rejected POST has zero side effects": {
+      "p1-async": 0
+    }
+  }
+}

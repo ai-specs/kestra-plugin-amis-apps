@@ -4,10 +4,21 @@ import {render as renderAmis} from 'amis-core';
 import 'amis/lib/renderers/Page';
 import 'amis/lib/renderers/Panel';
 import 'amis/lib/renderers/Tpl';
+import 'amis/lib/renderers/Plain';
 import 'amis/lib/renderers/Action';
 import 'amis-core/lib/renderers/Form';
 import 'amis/lib/renderers/Form/InputText';
 import 'amis/lib/renderers/Form/Control';
+import 'amis/lib/renderers/Form/InputNumber';
+import 'amis/lib/renderers/Form/Select';
+import 'amis/lib/renderers/Form/InputDate';
+import 'amis/lib/renderers/Form/Switch';
+import 'amis/lib/renderers/Form/InputArray';
+import 'amis/lib/renderers/Service';
+import 'amis/lib/renderers/Table/index';
+import 'amis/lib/renderers/CRUD';
+import 'amis/lib/renderers/Pagination';
+import 'amis/lib/renderers/Dialog';
 import 'amis-ui/lib/locale/en-US';
 import 'amis-ui/lib/locale/zh-CN';
 import lightSkin from 'amis/lib/themes/cxd.css?inline';
@@ -18,7 +29,8 @@ import 'amis/lib/helper.css';
 import 'amis/sdk/iconfont.css';
 import {supportedLocales, resolveLocale} from '../.host-sdk/locales.mjs';
 import contract from '../.host-sdk/contract.json';
-import {parseBootstrap, createTransport} from './runtime.mjs';
+import {parseBootstrap} from './runtime.mjs';
+import {createExecutionSession} from './execution-session.mjs';
 import {createPublishedPreferenceAdapter} from './preferences.mjs';
 import {localeMessages} from './messages.mjs';
 import './style.css';
@@ -32,8 +44,11 @@ function App() {
   const [schema, setSchema] = React.useState(null);
   const [error, setError] = React.useState('');
   const [state, setState] = React.useState('loading');
+  const [recovery, setRecovery] = React.useState(null);
+  const [recoveredData, setRecoveredData] = React.useState(null);
   const [systemDark, setSystemDark] = React.useState(media.matches);
   const transport = React.useRef();
+  const executionBusy = React.useRef(false);
   const preferences = React.useRef();
   const text = localeMessages[locale];
   const resolvedTheme = theme === 'syncWithSystem' ? (systemDark ? 'dark' : 'light') : theme;
@@ -47,6 +62,14 @@ function App() {
     document.documentElement.style.colorScheme = resolvedTheme === 'light' ? 'light' : 'dark';
   }, [resolvedTheme]);
   React.useEffect(() => {
+    const preventDuplicate = event => {
+      if (executionBusy.current && event.target.closest('[data-amis-content] button[type="submit"]') && (event.type !== 'keydown' || ['Enter', ' '].includes(event.key))) {
+        event.preventDefault(); event.stopImmediatePropagation();
+      }
+    };
+    document.addEventListener('click', preventDuplicate, true);
+    document.addEventListener('mousedown', preventDuplicate, true);
+    document.addEventListener('keydown', preventDuplicate, true);
     try {
       preferences.current = createPublishedPreferenceAdapter(contract, {
         storage: window.localStorage, events: window, media, signal: lifetime.signal,
@@ -55,17 +78,28 @@ function App() {
       });
       const config = parseBootstrap(JSON.parse(document.getElementById('amis-bootstrap').textContent), location.origin);
       if (!contract.themes.includes('light') || !contract.themes.includes('dark')) throw new Error('Unsupported SDK theme contract');
-      transport.current = createTransport(config, {
+      transport.current = createExecutionSession(config, {
         origin: location.origin,
         csrf: document.querySelector('meta[name="csrf-token"]')?.content,
         signal: lifetime.signal,
         onError: setError,
-        onState: next => {setState(next); if (next === 'waiting') setError('');}
-      });
+        onRecovery: setRecovery,
+        onState: next => {executionBusy.current = ['waiting', 'paused'].includes(next); setState(next); if (next === 'waiting') setError('');}
+      }, window.sessionStorage);
       transport.current.schema().then(value => {setSchema(value); setState('idle');}).catch(failure => {setError(failure.message); setState('error');});
     } catch (failure) {setError(failure.message); setState('error');}
-    return () => {preferences.current?.dispose(); lifetime.abort();};
+    return () => {document.removeEventListener('click', preventDuplicate, true); document.removeEventListener('mousedown', preventDuplicate, true); document.removeEventListener('keydown', preventDuplicate, true); preferences.current?.dispose(); lifetime.abort();};
   }, []);
+
+  const renderedPage = React.useMemo(() => schema && renderAmis(schema, {locale: locale === 'zh_CN' ? 'zh-CN' : 'en-US', theme: skin, ...(recoveredData ? {data: recoveredData} : {})}, {
+        fetcher: options => transport.current.fetcher({...options, cancelExecutor: cancel => {cancelCurrent = cancel; options.cancelExecutor?.(cancel);}}),
+        isCancel: failure => failure?.name === 'AbortError',
+        notify: (type, message) => {if (type === 'error') setError(String(message));},
+        alert: message => {setError(String(message)); return Promise.resolve();},
+        confirm: () => Promise.resolve(false),
+        jumpTo: () => setError('Navigation is outside P0 runtime scope'),
+        updateLocation: () => setError('Navigation is outside P0 runtime scope')
+      }), [schema, locale, skin, recoveredData]);
 
   return <>
     <style data-amis-skin={skin}>{skin === 'dark' ? darkSkin : lightSkin}</style>
@@ -79,19 +113,21 @@ function App() {
       </select></label>
       <a href="/oidc/logout">{text.logout}</a>
     </header>
-    <main aria-busy={state === 'loading' || state === 'waiting'}>
+    <main aria-busy={state === 'loading' || state === 'waiting' || state === 'paused'}>
       <p role="status" aria-live="polite">{text[state] || ''}</p>
       {error && <section role="alert"><strong>{text.error}</strong><p>{error}</p><a href="/oidc/logout">{text.logout}</a></section>}
-      {state === 'waiting' && <button onClick={() => cancelCurrent?.()}>{text.cancel}</button>}
-      {schema && renderAmis(schema, {locale: locale === 'zh_CN' ? 'zh-CN' : 'en-US', theme: skin}, {
-        fetcher: options => transport.current.fetcher({...options, cancelExecutor: cancel => {cancelCurrent = cancel; options.cancelExecutor?.(cancel);}}),
-        isCancel: failure => failure?.name === 'AbortError',
-        notify: (type, message) => {if (type === 'error') setError(String(message));},
-        alert: message => {setError(String(message)); return Promise.resolve();},
-        confirm: () => Promise.resolve(false),
-        jumpTo: () => setError('Navigation is outside P0 runtime scope'),
-        updateLocation: () => setError('Navigation is outside P0 runtime scope')
-      })}
+      {(state === 'waiting' || state === 'paused') && <button onClick={() => cancelCurrent?.()}>{text.cancel}</button>}
+      {recovery && <section aria-label={text.recovery}>
+        <p>{recovery.phase === 'pending' ? `${text.recovery}: ${recovery.executionId}` : text.uncertain}</p>
+        {recovery.phase === 'pending' && !['waiting', 'paused'].includes(state) && <button onClick={() => {
+          transport.current.resume({cancelExecutor: cancel => {cancelCurrent = cancel;}})
+            .then(result => {setRecoveredData(result.data.data); setError('');}).catch(failure => setError(failure.message));
+        }}>{text.resume}</button>}
+        {!['waiting', 'paused'].includes(state) && <button onClick={() => {
+          if (window.confirm(text.forgetConfirm)) {transport.current.forget(); setError(''); setState('idle');}
+        }}>{text.forget}</button>}
+      </section>}
+      {schema && <fieldset className="amis-content" data-amis-content disabled={state === 'waiting' || state === 'paused'}>{renderedPage}</fieldset>}
     </main>
   </>;
 }

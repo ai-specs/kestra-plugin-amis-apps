@@ -8,3 +8,5 @@ header a, [role="alert"] a { color: inherit; text-decoration: underline; }
 :focus-visible { outline: 3px solid var(--primary) !important; outline-offset: 3px; }
 [role="alert"] { border: 1px solid var(--danger); padding: 1rem; color: var(--danger); margin-bottom: 1rem; }
 @media (max-width: 480px) { header { gap: .75rem; } main { padding: .75rem; } input { max-width: 100%; } }
+
+.amis-content { border: 0; margin: 0; padding: 0; min-width: 0; }

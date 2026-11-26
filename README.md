@@ -4,7 +4,7 @@
 应用变更无需编译应用专属前端；扩展固定运行时按本仓独立发布。
 
 当前实现覆盖 P0 的单页面、单 API、固定 AMIS 运行时及其认证、授权和有界执行接线。
-P1 复杂控件、P2 多页面/API 激活和 P3 编辑器不在此版本范围。
+P1 提供复杂控件与执行生命周期的独立验收门；P2 多页面/API 激活和 P3 编辑器不在当前范围。
 取用时必须核对所选提交的成功检查、独立发布 workflow 与 `release-provenance.json`；
 根仓生产组合验收是另一道必需门，不能把模型阶段的 jar 或组件测试当作 P0 阶段交付。
 总体需求基线为部署仓 `docs/amis-apps-requirements.md`，版本
@@ -249,7 +249,7 @@ python3 scripts/test-build-gates.py
 
 独立 CI 为 `.github/workflows/foundation.yml`，与本地执行相同的 `prepare-host.sh`、
 `gradle.sh clean check`、启动器回归和负向构建门。随后再次核对恢复后的输入与 jar。
-CI 不 checkout 相邻仓、不编译宿主、不运行容器或数据库。
+CI 不 checkout 相邻仓、不编译宿主。P0 模型门不运行服务；新增 P1 生产执行门单独创建一个 PostgreSQL 和一个正式宿主容器，结束清理本次资源。
 报告上传显式包含隐藏目录，失败时也保留已执行的报告；正式接收仍需实际下载 artifact，
 核对提交、测试零失败/跳过、镜像 digest 与 jar hash，不能仅看上传步骤成功。
 
@@ -260,8 +260,8 @@ CI 不 checkout 相邻仓、不编译宿主、不运行容器或数据库。
 并检查模型和 introspection 的实际类来源为被测 jar。
 
 薄 jar 门只接受本插件包内 class、精确两项 Plugin 服务声明、两项实际生成的合法
-BeanIntrospectionReference 索引及对应 class；禁止业务 BeanDefinitionReference、
-其他服务登记、宿主/第三方 class 和嵌套 jar。门内用独立 JVM 实际装载 introspection，
+BeanIntrospectionReference 索引及对应 class；业务运行时仅允许 `AmisHttpRouteProvider` 的一项精确 BeanDefinitionReference；禁止
+其他业务 bean、其他服务登记、宿主/第三方 class 和嵌套 jar。门内用独立 JVM 实际装载 introspection，
 不能以文件名存在冒充合法元数据。Jackson、宿主和处理器依赖都不打入插件 jar。
 负向门保留原有四项，并增加错误服务、额外资源、缺服务、额外 provider、缺 introspection 和损坏 introspection 检查。
 
@@ -287,3 +287,57 @@ BeanIntrospectionReference 索引及对应 class；禁止业务 BeanDefinitionRe
 模型提交的成功独立 CI 范围见前述记录，不能作为本轮运行时的检查或部署证据。
 所选运行时必须对应成功检查、已完成的独立发布和根仓组合报告；缺任一必需门不得宣布阶段交付。
 完整阶段由主控核对独立仓发布与根仓真实组合证据后裁决。
+
+
+## P1 公开示例与独立生产门
+
+`examples/p1/scenarios.json` 是公开示例入口，包含 7 个单页面、单 API Flow 及其
+schema 路径。`.yaml` 文件使用合法的 JSON 格式 YAML，交由宿主原生 Flow API 解析。
+各 Flow namespace 为 `company.p1`，pageId 为 `home`，apiId 为 `run`；页面 API 都是
+显式 POST。schema 保存目标由 `namespaceFile` 明确指定。输入 `action` 支持
+`save/slow/fail/pause/init/query/conditional`，不通过 body 替换 apiId。
+
+`controls.json` 包含文本、数字、选择、日期、开关、数组、必填及条件显示；
+`query.json` 使用同一个 API 的 `action=query`，输入 `page/perPage`，输出
+`items/total`；第二页为空，用于验证空态。`init.json`、`conditional.json` 和
+`dialog.json` 分别验证页面加载、条件请求和对话框表单。表单结果 `response` 包含
+`message` 及已保存字段。`slow` 实际 Sleep 8 秒；`fail` 实际 Fail；`pause` 实际
+暂停 3 秒后恢复。示例验收必须由真实 Flow 引擎执行；取用时核对正式 artifact 的 sourceCi、逐例成功报告和根仓组合报告。
+
+`p1-async` 不声明 mode，验证默认 ASYNC；`p1-sync` 显式 SYNC 等待 `PT10S`；
+`p1-sync-expiry` 显式 SYNC 等待 `PT0.25S`。到期只返回原 execution 的 pending
+响应，后续 GET 查询原 execution。浏览器维护参数 `kestra.amis-apps.poll-timeout`
+默认 `PT5M`，允许 `PT0.001S` 至 `PT5M`，无效值拒绝启动。生产测试显式设为
+`PT5S`，用真实 8 秒执行验证浏览器等待超时，随后查询同一执行。
+
+页面刷新、离开重入和取消等待均不隐式重发 POST。执行引用以版本化记录保存在当前
+浏览器 tab 的 sessionStorage，只保存规范路径、状态及 executionId，不保存输入、
+输出或凭据。已有执行必须显式继续查询；提交确认丢失时显示结果不确定，禁止自动
+重试。每次结果 GET 仍执行生产认证和完整权限链。清除引用必须明确确认，且不会
+取消执行；之后主动提交可能创建另一条 execution，不提供跨客户端持久化幂等保证。
+
+先执行原门及新增无 PG 门：
+
+```bash
+AMIS_BUILD_DIR=.work/p1-check bash scripts/gradle.sh clean check
+AMIS_BUILD_DIR=.work/p1-check python3 scripts/test-build-gates.py
+python3 scripts/test-package-release.py
+npm --prefix ui run test:chromium
+npm --prefix ui run test:preferences:red
+npm --prefix ui run test:p1
+```
+
+生产 runner 为 `node scripts/run-p1-production.mjs OPTIONS_JSON`。该文件必须为
+维护者安排独占 Docker 窗口后生成的 0600 文件，含 `schemaVersion:1`、
+`startIsolatedStack:true`、本仓 `.work` 下不存在的绝对 `directory`、绝对 `jar`、
+实际 `jarSha256` 和独占 `port`。runner 固定读取本仓正式 host digest，拒绝与其他
+PostgreSQL 容器并行；创建独占 Compose 项目的单 PG 和单宿主，使用生成的测试凭据，
+通过生产登录保存 Flow/schema 并运行 Chromium。结束核对 owner 并清理自己的容器、网络和卷；宿主 storage 使用本次专属命名卷，不修改用户目录权限。
+本地私密配置、密码和宿主原始日志留在 `.work`，不得发布。
+
+精确新增矩阵见 `contracts/p1-cases.json`；报告 schema 见运行时契约。控件 transport
+20 项与生产 execution 16 项分别报告，不能互相替代。publisher 必须验证两份报告、
+精确 ID、正式输入、实际 jar 及逐项证据 hash，打包 `release/examples/p1/`、
+`release/contracts/p1-cases.json`、`release/ui-reports/p1-transport.json` 与
+`release/ui-reports/p1-production.json`，并由 provenance.files 绑定。
+根仓从正式 OCI 取得示例后另行执行模式 A/B 组合；不读取相邻示例或触发插件构建。
