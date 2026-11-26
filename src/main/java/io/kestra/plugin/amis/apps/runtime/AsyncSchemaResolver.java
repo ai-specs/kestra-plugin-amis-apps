@@ -46,11 +46,18 @@ public final class AsyncSchemaResolver {
                         if (bytes.isEmpty()) return Mono.just(Optional.empty());
                         parser.parse(bytes.orElseThrow());
                         return Mono.just(Optional.of(AmisSchema.parse(bytes.orElseThrow())));
-                    } catch (RuntimeException exception) {
-                        return Mono.error(exception);
+                    } catch (IllegalArgumentException exception) {
+                        return Mono.error(new InvalidSchemaException(exception));
                     }
                 });
         });
+    }
+
+    /** Marks only validation of bytes already returned by the reader. */
+    public static final class InvalidSchemaException extends IllegalArgumentException {
+        private InvalidSchemaException(IllegalArgumentException cause) {
+            super("Invalid AMIS schema document", cause);
+        }
     }
 
     @FunctionalInterface

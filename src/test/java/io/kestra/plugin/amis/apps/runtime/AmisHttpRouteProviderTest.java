@@ -391,6 +391,34 @@ class AmisHttpRouteProviderTest {
         verifyNoMoreInteractions(files);
     }
 
+    @Test void invalidSchemaHttpDispatchReturns400WithoutParentReadAndPreservesReaderFailures() {
+        var access = mock(PublishedFlowAccess.class);
+        var snapshot = snapshot(flow(false, false));
+        when(access.lookupAfterEntry("company.demo", "greeting-app")).thenReturn(snapshot);
+        when(access.withFlowExecutionPermission(any(), eq(snapshot), any())).thenAnswer(call -> invokeSupplier(call.getArgument(2)));
+        var invocation = mock(PublishedFlowInvocation.class);
+        when(invocation.finishRequest()).thenReturn(Mono.empty());
+        var files = mock(io.kestra.webserver.rbac.FlowNamespaceFileReaderV1.class);
+        var request = authenticated(HttpRequest.GET("/company.demo/greeting-app/schemas/home"));
+        when(files.read(any(), anyString(), any(), eq("company.demo"), eq("/home.json"), anyInt()))
+            .thenReturn(Mono.just(Optional.of(new io.kestra.webserver.rbac.FlowNamespaceFileReaderV1.Content(
+                "company.demo", "/home.json", "{invalid-json".getBytes(java.nio.charset.StandardCharsets.UTF_8)))));
+        var provider = new AmisHttpRouteProvider(access, invocation, mock(PublishedExecutionResults.class),
+            new PublishedFlowSchemas(files), mock(RuntimeAssets.class), mock(PageDocument.class), 1);
+        var route = provider.match(HttpMethod.GET, request.getUri().getRawPath()).orElseThrow();
+        assertStatus(HttpStatus.BAD_REQUEST, () -> Mono.from(provider.handle(request, route)).block());
+        verify(files, times(1)).read(any(), anyString(), any(), eq("company.demo"), eq("/home.json"), anyInt());
+        verifyNoMoreInteractions(files);
+        for (RuntimeException original : new RuntimeException[] {new IllegalArgumentException("reader failure"),
+            new HttpStatusException(HttpStatus.FORBIDDEN, "denied"), new HttpStatusException(HttpStatus.SERVICE_UNAVAILABLE, "IO failure")}) {
+            reset(files);
+            when(files.read(any(), anyString(), any(), anyString(), anyString(), anyInt())).thenReturn(Mono.error(original));
+            assertSame(original, Mono.from(provider.handle(request, route)).materialize().block().getThrowable());
+            verify(files).read(any(), anyString(), any(), eq("company.demo"), eq("/home.json"), anyInt());
+            verifyNoMoreInteractions(files);
+        }
+    }
+
     private static PublishedFlowAccess.Snapshot snapshot(Flow flow) {
         return new PublishedFlowAccess.Snapshot(ProcessedFlow.of(io.kestra.core.services.FlowParsingService.toFlowWithSource(flow)),
             RouteDeclarations.from(flow));

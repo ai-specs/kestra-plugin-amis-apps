@@ -79,8 +79,32 @@ class PublishedFlowSchemasTest {
         byte[] malformed = "{\"type\":".getBytes(java.nio.charset.StandardCharsets.UTF_8);
         when(files.read(same(identity), eq("main"), same(flow), eq("company.team"), eq("/home.json"), eq(1_048_576)))
             .thenReturn(Mono.just(Optional.of(new FlowNamespaceFileReaderV1.Content("company.team", "/home.json", malformed))));
-        assertThrows(IllegalArgumentException.class,
+        var failure = assertThrows(io.micronaut.http.exceptions.HttpStatusException.class,
             () -> new PublishedFlowSchemas(files).resolve(identity, snapshot, "company.team", "nsfile:///home.json").block());
+        assertEquals(io.micronaut.http.HttpStatus.BAD_REQUEST, failure.getStatus());
+        verifyOnlyCurrentCandidate();
+    }
+
+    @Test void readerIllegalArgumentAndHttpFailuresAreNotReclassifiedAsSchemaValidation() {
+        when(snapshot.flow()).thenReturn(flow);
+        for (RuntimeException failure : new RuntimeException[] {new IllegalArgumentException("reader configuration failure"),
+            new io.micronaut.http.exceptions.HttpStatusException(io.micronaut.http.HttpStatus.FORBIDDEN, "denied"),
+            new io.micronaut.http.exceptions.HttpStatusException(io.micronaut.http.HttpStatus.SERVICE_UNAVAILABLE, "storage failure")}) {
+            reset(files);
+            when(files.read(any(), anyString(), any(), anyString(), anyString(), anyInt())).thenReturn(Mono.error(failure));
+            assertSame(failure, assertThrows(RuntimeException.class,
+                () -> new PublishedFlowSchemas(files).resolve(identity, snapshot, "company.team", "nsfile:///home.json").block()));
+            verifyOnlyCurrentCandidate();
+        }
+    }
+
+    @Test void readerIOExceptionPropagatesAsOriginalReactiveErrorWithoutParentLookup() {
+        when(snapshot.flow()).thenReturn(flow);
+        var original = new java.io.IOException("storage unavailable");
+        when(files.read(any(), anyString(), any(), anyString(), anyString(), anyInt())).thenReturn(Mono.error(original));
+        var signal = new PublishedFlowSchemas(files).resolve(identity, snapshot, "company.team", "nsfile:///home.json")
+            .materialize().block();
+        assertSame(original, signal.getThrowable());
         verifyOnlyCurrentCandidate();
     }
 

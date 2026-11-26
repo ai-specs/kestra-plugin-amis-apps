@@ -3,6 +3,8 @@ package io.kestra.plugin.amis.apps.runtime;
 import io.kestra.plugin.amis.apps.domain.AmisSchema;
 import io.kestra.webserver.rbac.FlowNamespaceFileReaderV1;
 import io.micronaut.security.authentication.Authentication;
+import io.micronaut.http.HttpStatus;
+import io.micronaut.http.exceptions.HttpStatusException;
 import reactor.core.publisher.Mono;
 import java.util.Objects;
 import java.util.Optional;
@@ -29,7 +31,9 @@ final class PublishedFlowSchemas {
                             throw new IllegalStateException("Published file tuple differs from requested candidate");
                         return value.bytes();
                     })), AmisSchema.MAX_BYTES, AmisSchema.MAX_DEPTH);
-            return resolver.resolve(namespace, uri);
+            return resolver.resolve(namespace, uri)
+                .onErrorMap(AsyncSchemaResolver.InvalidSchemaException.class,
+                    failure -> new HttpStatusException(HttpStatus.BAD_REQUEST, "Invalid AMIS schema document"));
         });
     }
 }

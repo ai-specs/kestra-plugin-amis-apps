@@ -48,6 +48,10 @@ execution，并核对 namespace、Flow、API 和执行来源。不得直接调�
 
 ## 数据响应与轮询
 
+schema 读取只在文件不存在时回溯父级。已读取文件的 JSON 或 AMIS 根结构不合法时返回
+`400`，不得回落父级或将其伪装为暂时不可用。宿主读取、身份及授权错误保留其原有失败
+语义；未知依赖故障仍失败关闭，不将所有读取异常改成输入错误。
+
 API 数据使用 AMIS 信封：`status`（0 成功，非零失败）、`msg`、对象 `data`；执行响应
 另有顶层 `executionId`、`executionState`、`resultReady` 与同源 `executionUrl`。
 
