@@ -22,6 +22,12 @@ class P1ExamplesTest {
                 assertEquals("home", ((PageTrigger) flow.getTriggers().get(0)).getPageId());
                 assertEquals("run", ((ApiTrigger) flow.getTriggers().get(1)).getApiId());
                 assertEquals("response", flow.getOutputs().get(0).getId());
+                assertEquals("{{ outputs.responseValue.value }}", flow.getOutputs().get(0).getValue());
+                assertInstanceOf(io.kestra.plugin.core.debug.Return.class, flow.getTasks().get(0));
+                assertEquals("responseValue", flow.getTasks().get(0).getId());
+                var declaration = io.kestra.core.serializers.JacksonMapper.ofJson().readTree(Files.readString(path));
+                assertEquals("JSON", declaration.path("outputs").get(0).path("type").asText());
+                assertTrue(declaration.path("tasks").get(0).path("format").asText().contains("| toJson"));
             }
         }
     }

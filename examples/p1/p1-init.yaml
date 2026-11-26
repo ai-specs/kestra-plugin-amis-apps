@@ -56,6 +56,11 @@
   ],
   "tasks": [
     {
+      "id": "responseValue",
+      "type": "io.kestra.plugin.core.debug.Return",
+      "format": "{{ {\"action\": inputs.action, \"message\": inputs.name, \"quantity\": inputs.quantity, \"category\": inputs.category, \"date\": inputs.date, \"enabled\": inputs.enabled, \"details\": inputs.details, \"tags\": inputs.tags, \"items\": (inputs.action == 'query' and inputs.page == 1 ? fromJson('[{\"id\":1,\"name\":\"ROW-ONE\"},{\"id\":2,\"name\":\"ROW-TWO\"}]') : fromJson('[]')), \"total\": (inputs.action == 'query' ? 3 : 0)} | toJson }}"
+    },
+    {
       "id": "scenario",
       "type": "io.kestra.plugin.core.flow.Switch",
       "value": "{{ inputs.action }}",
@@ -95,7 +100,7 @@
     {
       "id": "response",
       "type": "JSON",
-      "value": "{{ {\"action\": inputs.action, \"message\": inputs.name, \"quantity\": inputs.quantity, \"category\": inputs.category, \"date\": inputs.date, \"enabled\": inputs.enabled, \"details\": inputs.details, \"tags\": inputs.tags, \"items\": (inputs.action == 'query' and inputs.page == 1 ? fromJson('[{\"id\":1,\"name\":\"ROW-ONE\"},{\"id\":2,\"name\":\"ROW-TWO\"}]') : fromJson('[]')), \"total\": (inputs.action == 'query' ? 3 : 0)} | toJson }}"
+      "value": "{{ outputs.responseValue.value }}"
     }
   ],
   "triggers": [

@@ -205,3 +205,11 @@ flowId、executionId、tenantId 中任一字段。未知类型、携带任一身
 “全队列不变”。单元负例验证带身份记录、未知类型及同数量 offset 替换不会被排除。
 业务数据库摘要覆盖 flows、executions、execution_queued、namespace_file_metadata、
 kv_metadata、execution_outputs 的完整内容。侧效证据记录实际 coverage。
+
+### 示例与既有 RBAC 输出依赖解析
+
+模式 B 的既有安全输出解析只接受固定任务输出路径，例如
+`{{ outputs.responseValue.value }}`。公开 P1 示例将复杂表达式放在普通公开
+`io.kestra.plugin.core.debug.Return` 任务的 `format` 中，再由 `type: JSON` 的 Flow
+output 引用该任务的 JSON 字符串。宿主按 JSON 类型解析为对象，保留数字、布尔值和数组。
+这复用现有执行授权与任务边界，不为输入表达式、函数、过滤器或动态输出路径放宽依赖门。

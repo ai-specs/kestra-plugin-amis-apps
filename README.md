@@ -342,3 +342,9 @@ PostgreSQL 容器并行；创建独占 Compose 项目的单 PG 和单宿主，�
 `release/contracts/p1-cases.json`、`release/ui-reports/p1-transport.json` 与
 `release/ui-reports/p1-production.json`，并由 provenance.files 绑定。
 根仓从正式 OCI 取得示例后另行执行模式 A/B 组合；不读取相邻示例或触发插件构建。
+
+P1 示例兼容既有 RBAC 安全输出解析：复杂 JSON 渲染放在公开
+`io.kestra.plugin.core.debug.Return` 任务 `responseValue` 的 `format`，Flow 的
+`response` 使用 `type: JSON`，只引用固定路径 `{{ outputs.responseValue.value }}`。
+宿主将任务生成的 JSON 字符串解析为对象，数字、布尔值及数组保持类型。
+不得将复杂 `inputs` 表达式、函数或过滤器直接放入 Flow outputs 后要求放宽 RBAC 门。
