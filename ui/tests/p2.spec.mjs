@@ -8,6 +8,9 @@ const pending=api=>({...ready(api),resultReady:false,executionState:'PAUSED',dat
 const form=api=>({type:'form',title:api,api:'post:'+api,body:[{type:'input-text',name:'value',value:api},{type:'tpl',tpl:'Result '+api+': ${message}'}],actions:[{type:'submit',label:'Submit '+api}]});
 const schema={type:'page',title:'P2 TEST TRANSPORT',body:[{type:'button',label:'Detail',actionType:'url',url:'detail'},{type:'button',label:'Escape',actionType:'url',url:'https://foreign.invalid/'},form('alpha'),form('beta')]};
 const observations=new WeakMap();
+let currentDocument=null;
+async function updateCurrentDocument(page){currentDocument=await page.evaluate(()=>({documentId:window.__p2TransportDocumentId,timeOrigin:performance.timeOrigin}));}
+
 const responseTasks=new WeakMap();
 const requestTerminals=new WeakMap();
 async function setup(page,options={}) {
@@ -31,7 +34,7 @@ async function setup(page,options={}) {
    const row={requestId:'request-'+(evidence.requests.length+1),at:Date.now(),method:request.method(),api,apiId:api,path:url.pathname,inputs:request.method()==='POST'?request.postDataJSON():null,revision:request.headers()['x-amis-flow-revision'],httpStatus:null};
    let resolveTerminal;const terminal=new Promise(resolve=>{resolveTerminal=resolve;});requestTerminals.set(row,{promise:terminal,resolve:resolveTerminal});
    evidence.requests.push(row);requestRows.set(request,row);
-   const document=await page.evaluate(()=>({documentId:window.__p2TransportDocumentId,timeOrigin:performance.timeOrigin}));
+   const document=currentDocument;
    Object.assign(row,document);
    if(state.unknown&&api==='alpha'&&request.method()==='POST')return route.abort('failed');
    if(state.conflict&&request.method()==='POST')return route.fulfill({status:409,headers:{...headers,'X-AMIS-Error-Code':'FLOW_REVISION_CONFLICT'},json:{status:1}});
@@ -43,7 +46,7 @@ async function setup(page,options={}) {
   }
   return route.continue();
  });
- await page.goto(origin+path('home'));await expect(page.getByText('P2 TEST TRANSPORT',{exact:true})).toBeVisible();return {state,evidence};
+ await page.goto(origin+path('home'));await expect(page.getByText('P2 TEST TRANSPORT',{exact:true})).toBeVisible();await updateCurrentDocument(page);return {state,evidence};
 }
 const region=(page,api)=>page.locator('section[data-api-id="'+api+'"]');
 const posts=(e,api)=>e.requests.filter(row=>row.method==='POST'&&(!api||row.api===api));
@@ -51,7 +54,7 @@ async function submit(page,api){await page.getByRole('button',{name:'Submit '+ap
 async function paused(page,api){await expect(region(page,api).getByRole('status')).toContainText('paused');}
 async function cancel(page,api){await region(page,api).getByRole('button',{name:'Cancel request',exact:true}).click();await expect(region(page,api).getByRole('alert')).toContainText('Request cancelled');}
 async function resume(page,api){await region(page,api).getByRole('button',{name:'Resume result query',exact:true}).click();await expect(region(page,api).getByLabel('Recovered business result')).toContainText(api+'-only');}
-async function observe(page,label,verify){
+async function observe(page,label,verify){await updateCurrentDocument(page);
  await Promise.all(responseTasks.get(page));
  const actual=await page.evaluate(()=>{
   const buttons=root=>Array.from(root.querySelectorAll('button')).map(button=>({text:button.textContent.trim(),disabled:button.disabled,visible:!!button.getClientRects().length,focused:button===document.activeElement}));
