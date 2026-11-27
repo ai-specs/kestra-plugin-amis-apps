@@ -129,6 +129,7 @@ test('P2-T08-paused-per-api-keyboard-cancel',async({page})=>{
 test('P2-T09-refresh-resumes-two-confirmed-ids',async({page})=>{
  const {state,evidence}=await setup(page);await submit(page,'alpha');await submit(page,'beta');await paused(page,'alpha');await paused(page,'beta');
  const before=await observe(page,'confirmed-ids',actual=>{expect(recordFor(actual,'alpha').executionId).toBe('exec-alpha');expect(recordFor(actual,'beta').executionId).toBe('exec-beta');});
+ await Promise.all(responseTasks.get(page));
  await page.reload();await expect(region(page,'alpha').getByRole('button',{name:'Resume result query'})).toBeVisible();await expect(region(page,'beta').getByRole('button',{name:'Resume result query'})).toBeVisible();
  await observe(page,'reload',actual=>{expect(actual.documentId).not.toBe(before.documentId);expect(actual.timeOrigin).not.toBe(before.timeOrigin);expect(actual.session).toEqual(before.session);});
  state.hold=false;await resume(page,'alpha');await resume(page,'beta');expect(posts(evidence)).toHaveLength(2);
