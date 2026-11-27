@@ -1,0 +1,118 @@
+{
+  "id": "multi-app",
+  "namespace": "company.p2",
+  "inputs": [
+    {
+      "id": "apiId",
+      "type": "STRING",
+      "required": true
+    },
+    {
+      "id": "action",
+      "type": "STRING",
+      "defaults": "save"
+    },
+    {
+      "id": "marker",
+      "type": "STRING",
+      "defaults": "P2-MARKER"
+    },
+    {
+      "id": "quantity",
+      "type": "INT",
+      "defaults": 3
+    },
+    {
+      "id": "enabled",
+      "type": "BOOL",
+      "defaults": true
+    },
+    {
+      "id": "tags",
+      "type": "ARRAY",
+      "itemType": "STRING",
+      "defaults": [
+        "one",
+        "two"
+      ]
+    }
+  ],
+  "tasks": [
+    {
+      "id": "alphaValue",
+      "type": "io.kestra.plugin.core.debug.Return",
+      "format": "{{ {\"api\": \"alpha\", \"marker\": \"P2-ALPHA\", \"inputMarker\": inputs.marker, \"quantity\": inputs.quantity, \"enabled\": inputs.enabled, \"tags\": inputs.tags, \"alphaOnly\": \"alpha-value\"} | toJson }}"
+    },
+    {
+      "id": "betaValue",
+      "type": "io.kestra.plugin.core.debug.Return",
+      "format": "{{ {\"api\": \"beta\", \"marker\": \"P2-BETA\", \"inputMarker\": inputs.marker, \"quantity\": inputs.quantity, \"enabled\": inputs.enabled, \"tags\": inputs.tags, \"betaOnly\": true} | toJson }}"
+    },
+    {
+      "id": "scenario",
+      "type": "io.kestra.plugin.core.flow.Switch",
+      "value": "{{ inputs.action }}",
+      "cases": {
+        "slow": [
+          {
+            "id": "wait",
+            "type": "io.kestra.plugin.core.flow.Sleep",
+            "duration": "PT8S"
+          }
+        ],
+        "pause": [
+          {
+            "id": "pause",
+            "type": "io.kestra.plugin.core.flow.Pause",
+            "pauseDuration": "PT3S"
+          }
+        ]
+      },
+      "defaults": [
+        {
+          "id": "quick",
+          "type": "io.kestra.plugin.core.debug.Return",
+          "format": "P2 actual engine"
+        }
+      ]
+    }
+  ],
+  "outputs": [
+    {
+      "id": "alphaResponse",
+      "type": "JSON",
+      "value": "[]"
+    },
+    {
+      "id": "betaResponse",
+      "type": "JSON",
+      "value": "{{ outputs.betaValue.value }}"
+    }
+  ],
+  "triggers": [
+    {
+      "id": "invokeAlpha",
+      "type": "io.kestra.plugin.amis.apps.ApiTrigger",
+      "apiId": "alpha",
+      "resultOutput": "alphaResponse"
+    },
+    {
+      "id": "invokeBeta",
+      "type": "io.kestra.plugin.amis.apps.ApiTrigger",
+      "apiId": "beta",
+      "resultOutput": "betaResponse"
+    },
+    {
+      "id": "pageHome",
+      "type": "io.kestra.plugin.amis.apps.PageTrigger",
+      "pageId": "home",
+      "schema": "nsfile:///p2/home.json"
+    },
+    {
+      "id": "pageDetail",
+      "type": "io.kestra.plugin.amis.apps.PageTrigger",
+      "pageId": "detail",
+      "schema": "nsfile:///p2/detail.json"
+    }
+  ]
+}

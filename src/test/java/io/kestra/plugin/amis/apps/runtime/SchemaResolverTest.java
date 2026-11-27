@@ -18,6 +18,20 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SchemaResolverTest {
+    @Test void p2SchemaDigestUsesActualBytesAndObservesIndependentFileUpdates() throws Exception {
+        var bytes = new java.util.concurrent.atomic.AtomicReference<>("{ \"type\": \"page\", \"body\": [] }".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        var resolver = new SchemaResolver((namespace, path) -> Optional.of(new java.io.ByteArrayInputStream(bytes.get())), 1048576, 64);
+        var first = resolver.resolve("company.team", "nsfile:///home.json").orElseThrow();
+        assertArrayEquals(bytes.get(), first.bytes());
+        assertEquals(java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes.get())), first.sha256());
+        byte[] escaped = first.bytes(); escaped[0] = 0;
+        assertEquals((byte) '{', first.bytes()[0]);
+        bytes.set("{\"type\":\"page\",\"body\":[]}".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        var second = resolver.resolve("company.team", "nsfile:///home.json").orElseThrow();
+        assertEquals(first.schema(), second.schema());
+        assertNotEquals(first.sha256(), second.sha256());
+    }
+
     @Test
     void currentFileWinsAndItsOriginAndFullSchemaAreReturned() throws Exception {
         List<String> calls = new ArrayList<>();

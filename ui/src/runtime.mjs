@@ -34,6 +34,15 @@ export function parseBootstrap(value, origin) {
   for (const [field, max] of Object.entries(maxima)) {
     if (!Number.isInteger(value.limits?.[field]) || value.limits[field] < 1 || value.limits[field] > max) throw new Error(`Invalid ${field}`);
   }
+  const fields = ['flowRevision', 'pageIds', 'apiIds'];
+  if (fields.some(field => Object.hasOwn(value, field))) {
+    if (!Number.isSafeInteger(value.flowRevision) || value.flowRevision <= 0 || value.flowRevision > 2147483647) throw new Error('Invalid flowRevision');
+    for (const field of ['pageIds', 'apiIds']) {
+      const ids = value[field];
+      if (!Array.isArray(ids) || new Set(ids).size !== ids.length || ids.some(id => typeof id !== 'string' || !customIdentifier.test(id))) throw new Error(`Invalid ${field}`);
+    }
+    if (!value.pageIds.includes(value.pageId)) throw new Error('Current page is not declared');
+  }
   return value;
 }
 
@@ -53,19 +62,32 @@ function delay(milliseconds, signal) {
   });
 }
 
-export function createTransport(config, {origin, csrf, signal, fetchImpl = fetch, onError = () => {}, onState = () => {}, onExecution = () => {}}) {
+export function createTransport(config, {origin, csrf, signal, fetchImpl = fetch, onError = () => {}, onState = () => {}, onExecution = () => {}, onSchema = () => {}}) {
   async function request(url, options, outerSignal) {
     const timeout = AbortSignal.timeout(config.limits.requestTimeoutMs);
     const combined = AbortSignal.any([signal, timeout, ...(outerSignal ? [outerSignal] : [])]);
     const response = await fetchImpl(url.href, {...options, credentials: 'same-origin', redirect: 'error', cache: 'no-store', signal: combined});
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    if (!response.ok) {
+      const refreshRequired = response.status === 409 && response.headers.get('X-AMIS-Error-Code') === 'FLOW_REVISION_CONFLICT';
+      await response.arrayBuffer();
+      const error = new Error(refreshRequired ? 'HTTP 409: Flow changed. Refresh the page before submitting again.' : `HTTP ${response.status}`);
+      error.refreshRequired = refreshRequired;
+      throw error;
+    }
+    if (config.flowRevision && response.headers.get('X-AMIS-Flow-Revision') !== String(config.flowRevision)) throw Object.assign(new Error('Flow changed. Refresh the page before submitting again.'), {refreshRequired: true});
     const body = await response.json();
     if (!object(body)) throw new Error('Invalid JSON response');
     return {response, body};
   }
   return {
     async schema() {
-      return (await request(safeUrl(config.schemaUrl, origin), {method: 'GET'})).body;
+      const result = await request(safeUrl(config.schemaUrl, origin), {method: 'GET', ...(config.flowRevision ? {headers: {'X-AMIS-Flow-Revision': String(config.flowRevision)}} : {})});
+      if (config.flowRevision) {
+        const sha256 = result.response.headers.get('X-AMIS-Schema-SHA256');
+        if (!/^[a-f0-9]{64}$/.test(sha256 ?? '')) throw new Error('Invalid schema source digest');
+        onSchema({flowRevision: config.flowRevision, sha256});
+      }
+      return result.body;
     },
     async fetcher({url: raw, method = 'get', data, signal: callerSignal, cancelExecutor, config: requestConfig = {}, resumeExecution}) {
       const controller = new AbortController();
@@ -76,14 +98,15 @@ export function createTransport(config, {origin, csrf, signal, fetchImpl = fetch
         const base = safeUrl(config.apiBase, origin).pathname;
         const url = safeUrl(typeof raw === 'string' && customIdentifier.test(raw) ? `${base}${raw}` : raw, origin);
         const apiId = url.pathname.slice(base.length);
-        if (method.toLowerCase() !== 'post' || !url.pathname.startsWith(base) || !customIdentifier.test(apiId)) throw new Error('Only same Flow POST API is allowed');
+        if (method.toLowerCase() !== 'post' || !url.pathname.startsWith(base) || !customIdentifier.test(apiId) || config.apiIds && !config.apiIds.includes(apiId)) throw new Error('Only same Flow POST API is allowed');
         if (!resumeExecution && (typeof csrf !== 'string' || !csrf.trim() || csrf.includes('__AMIS_') || /[\r\n]/.test(csrf))) throw new Error('Missing CSRF token');
         if (!resumeExecution && !object(data)) throw new Error('API body must be a JSON object');
         onState('waiting');
         const recoveryUrl = resumeExecution && validateExecutionUrl(resumeExecution.executionUrl, url, resumeExecution.executionId, origin);
-        let result = recoveryUrl ? await request(recoveryUrl, {method: 'GET'}, combined) : await request(url, {method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf}, body: JSON.stringify(data)}, combined);
+        let result = recoveryUrl ? await request(recoveryUrl, {method: 'GET'}, combined) : await request(url, {method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, ...(config.flowRevision ? {'X-AMIS-Flow-Revision': String(config.flowRevision)} : {})}, body: JSON.stringify(data)}, combined);
         const first = result.body;
         validateExecutionResponse(first, result.response.status);
+        if (config.flowRevision) validateExecutionUrl(first.executionUrl, url, first.executionId, origin);
         if (resumeExecution && first.executionId !== resumeExecution.executionId) throw new Error('Execution identity changed');
         let pollingUrl = recoveryUrl;
         if (result.response.status === 202 || first.resultReady === false) {
@@ -94,6 +117,7 @@ export function createTransport(config, {origin, csrf, signal, fetchImpl = fetch
         while (true) {
           const body = result.body;
           validateExecutionResponse(body, result.response.status);
+          if (config.flowRevision) validateExecutionUrl(body.executionUrl, url, first.executionId, origin);
           if (pollingUrl && body.executionId !== first.executionId) throw new Error('Execution identity changed');
           if (body.status !== 0 || failedStates.has(body.executionState)) {
             if (terminalStates.has(body.executionState)) onExecution(null);
@@ -116,7 +140,7 @@ export function createTransport(config, {origin, csrf, signal, fetchImpl = fetch
         const message = error.name === 'TimeoutError' ? 'Request timed out' : error.name === 'AbortError' ? 'Request cancelled' : error.message;
         onState('error');
         onError(message);
-        throw Object.assign(new Error(message), {name: error.name});
+        throw Object.assign(new Error(message), {name: error.name, refreshRequired: error.refreshRequired === true});
       }
     }
   };

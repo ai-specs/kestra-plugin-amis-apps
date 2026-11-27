@@ -363,6 +363,7 @@ class AmisHttpRouteProviderTest {
     private static ServerHttpRequest<?> serverRequest(HttpMethod method, String path, String contentType) {
         ServerHttpRequest<?> request = mock(ServerHttpRequest.class);
         when(request.getMethod()).thenReturn(method);
+        when(request.getHeaders()).thenReturn(HttpRequest.GET(path).getHeaders());
         when(request.getUri()).thenReturn(URI.create(path));
         when(request.getContentType()).thenReturn(contentType == null ? Optional.empty() : Optional.of(MediaType.of(contentType)));
         doReturn(Optional.of(Authentication.build("ada"))).when(request)
@@ -370,7 +371,7 @@ class AmisHttpRouteProviderTest {
         return request;
     }
 
-    @Test void schemaHttpDispatchUsesPublishedFlowReaderAndCurrentIdentity() {
+    @Test void schemaHttpDispatchUsesPublishedFlowReaderAndCurrentIdentity() throws Exception {
         var access = mock(PublishedFlowAccess.class);
         var snapshot = snapshot(flow(false, false));
         when(access.lookupAfterEntry("company.demo", "greeting-app")).thenReturn(snapshot);
@@ -378,7 +379,7 @@ class AmisHttpRouteProviderTest {
         var invocation = mock(PublishedFlowInvocation.class);
         when(invocation.finishRequest()).thenReturn(Mono.empty());
         var files = mock(io.kestra.webserver.rbac.FlowNamespaceFileReaderV1.class);
-        var request = authenticated(HttpRequest.GET("/company.demo/greeting-app/schemas/home"));
+        var request = authenticated(HttpRequest.GET("/company.demo/greeting-app/schemas/home").header("X-AMIS-Flow-Revision", "1"));
         var identity = request.getAttribute(io.micronaut.security.filters.SecurityFilter.AUTHENTICATION, Authentication.class).orElseThrow();
         byte[] bytes = "{\"type\":\"page\",\"body\":[]}".getBytes(java.nio.charset.StandardCharsets.UTF_8);
         when(files.read(same(identity), eq("main"), same(snapshot.flow()), eq("company.demo"), eq("/home.json"), eq(1_048_576)))
@@ -387,6 +388,9 @@ class AmisHttpRouteProviderTest {
             new PublishedFlowSchemas(files), mock(RuntimeAssets.class), mock(PageDocument.class), 1);
         var response = Mono.from(provider.handle(request, provider.match(HttpMethod.GET, request.getUri().getRawPath()).orElseThrow())).block();
         assertEquals(HttpStatus.OK, response.getStatus());
+        assertArrayEquals(bytes, (byte[]) response.body());
+        assertEquals("1", response.header("X-AMIS-Flow-Revision"));
+        assertEquals(java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes)), response.header("X-AMIS-Schema-SHA256"));
         verify(files).read(same(identity), eq("main"), same(snapshot.flow()), eq("company.demo"), eq("/home.json"), eq(1_048_576));
         verifyNoMoreInteractions(files);
     }
@@ -417,6 +421,87 @@ class AmisHttpRouteProviderTest {
             verify(files).read(any(), anyString(), any(), eq("company.demo"), eq("/home.json"), anyInt());
             verifyNoMoreInteractions(files);
         }
+    }
+
+    @Test void p2RevisionHeaderInvalidOrStaleStopsBeforeSchemaReadAndSubmit() {
+        var selected = snapshot(flow(false, false));
+        var access = mock(PublishedFlowAccess.class);
+        when(access.lookupAfterEntry(anyString(), anyString())).thenReturn(selected);
+        when(access.withFlowExecutionPermission(any(), eq(selected), any())).thenAnswer(call -> invokeSupplier(call.getArgument(2)));
+        var invocation = mock(PublishedFlowInvocation.class);
+        when(invocation.finishRequest()).thenReturn(Mono.empty());
+        var schemas = mock(SchemaResolver.class);
+        var provider = new AmisHttpRouteProvider(access, invocation, mock(PublishedExecutionResults.class), schemas,
+            mock(RuntimeAssets.class), mock(PageDocument.class), 1);
+        for (String path : List.of("/company.demo/greeting-app/schemas/home", "/company.demo/greeting-app/apis/greet")) {
+            for (String value : List.of("", "0", "01", "+1", " 1", "1 ", "2147483648", "1,1", "2")) {
+                var request = serverRequest(path.contains("/apis/") ? HttpMethod.POST : HttpMethod.GET, path, "application/json");
+                var headers = mock(io.micronaut.http.HttpHeaders.class);
+                when(headers.getAll("X-AMIS-Flow-Revision")).thenReturn(List.of(value));
+                when(request.getHeaders()).thenReturn(headers);
+                if (value.equals("2")) {
+                    var response = Mono.from(provider.handle(request, provider.match(request.getMethod(), path).orElseThrow())).block();
+                    assertEquals(HttpStatus.CONFLICT, response.getStatus());
+                    assertEquals("FLOW_REVISION_CONFLICT", response.header("X-AMIS-Error-Code"));
+                    assertEquals("no-store", response.header("Cache-Control"));
+                    assertEquals("nosniff", response.header("X-Content-Type-Options"));
+                    assertEquals(Map.of("status", 1, "msg", "Flow declaration changed", "data", Map.of(), "code", "FLOW_REVISION_CONFLICT"), response.body());
+                } else assertStatus(HttpStatus.BAD_REQUEST,
+                    () -> Mono.from(provider.handle(request, provider.match(request.getMethod(), path).orElseThrow())).block());
+            }
+            var request = serverRequest(path.contains("/apis/") ? HttpMethod.POST : HttpMethod.GET, path, "application/json");
+            var headers = mock(io.micronaut.http.HttpHeaders.class);
+            when(headers.getAll("X-AMIS-Flow-Revision")).thenReturn(List.of("1", "1"));
+            when(request.getHeaders()).thenReturn(headers);
+            assertStatus(HttpStatus.BAD_REQUEST,
+                () -> Mono.from(provider.handle(request, provider.match(request.getMethod(), path).orElseThrow())).block());
+        }
+        verifyNoInteractions(schemas);
+        verify(invocation, never()).submit(any(), any(), anyString(), any());
+    }
+
+    @Test void p2RevisionComparisonDoesNotBypassFlowAuthorization() {
+        var selected = snapshot(flow(false, false));
+        var access = mock(PublishedFlowAccess.class);
+        when(access.lookupAfterEntry(anyString(), anyString())).thenReturn(selected);
+        when(access.withFlowExecutionPermission(any(), eq(selected), any())).thenReturn(Mono.error(new HttpStatusException(HttpStatus.FORBIDDEN, "denied")));
+        var invocation = mock(PublishedFlowInvocation.class);
+        when(invocation.finishRequest()).thenReturn(Mono.empty());
+        var schemas = mock(SchemaResolver.class);
+        var provider = new AmisHttpRouteProvider(access, invocation, mock(PublishedExecutionResults.class), schemas,
+            mock(RuntimeAssets.class), mock(PageDocument.class), 1);
+        var request = authenticated(HttpRequest.GET("/company.demo/greeting-app/schemas/home").header("X-AMIS-Flow-Revision", "2"));
+        assertStatus(HttpStatus.FORBIDDEN, () -> Mono.from(provider.handle(request, provider.match(request.getMethod(), request.getPath()).orElseThrow())).block());
+        verifyNoInteractions(schemas);
+    }
+
+    @Test void p2BootstrapExposesEnabledDeclarationIdsAndRevision() throws Exception {
+        String source = "namespace: company.demo\nid: greeting-app\nrevision: 3\ntriggers:\n"
+            + "  - id: first\n    type: io.kestra.plugin.amis.apps.PageTrigger\n    pageId: home\n    schema: nsfile:///home.json\n"
+            + "  - id: second\n    type: io.kestra.plugin.amis.apps.PageTrigger\n    pageId: detail\n    schema: nsfile:///detail.json\n"
+            + "  - id: hidden\n    type: io.kestra.plugin.amis.apps.ApiTrigger\n    apiId: hidden\n    disabled: true\n"
+            + "  - id: alpha\n    type: io.kestra.plugin.amis.apps.ApiTrigger\n    apiId: alpha\n"
+            + "  - id: beta\n    type: io.kestra.plugin.amis.apps.ApiTrigger\n    apiId: beta\n";
+        var selected = snapshot(YamlParser.parse(source, Flow.class));
+        var access = mock(PublishedFlowAccess.class);
+        when(access.lookupAfterEntry(anyString(), anyString())).thenReturn(selected);
+        when(access.withFlowExecutionPermission(any(), eq(selected), any())).thenAnswer(call -> invokeSupplier(call.getArgument(2)));
+        var invocation = mock(PublishedFlowInvocation.class);
+        when(invocation.finishRequest()).thenReturn(Mono.empty());
+        var documents = mock(PageDocument.class);
+        doReturn(io.micronaut.http.HttpResponse.ok("html")).when(documents).response(any(), anyString(), anyString());
+        var provider = new AmisHttpRouteProvider(access, invocation, mock(PublishedExecutionResults.class), mock(SchemaResolver.class),
+            mock(RuntimeAssets.class), documents, 1);
+        var request = authenticated(HttpRequest.GET("/company.demo/greeting-app/pages/home"));
+        var response = Mono.from(provider.handle(request, provider.match(request.getMethod(), request.getPath()).orElseThrow())).block();
+        var captured = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(documents).response(same(request), eq("/company.demo/greeting-app/"), captured.capture());
+        var bootstrap = new com.fasterxml.jackson.databind.ObjectMapper().readTree(captured.getValue());
+        assertEquals(1, bootstrap.path("version").asInt());
+        assertEquals(3, bootstrap.path("flowRevision").asInt());
+        assertEquals("[\"home\",\"detail\"]", bootstrap.path("pageIds").toString());
+        assertEquals("[\"alpha\",\"beta\"]", bootstrap.path("apiIds").toString());
+        assertEquals("3", response.header("X-AMIS-Flow-Revision"));
     }
 
     private static PublishedFlowAccess.Snapshot snapshot(Flow flow) {

@@ -4,7 +4,8 @@
 应用变更无需编译应用专属前端；扩展固定运行时按本仓独立发布。
 
 当前实现覆盖 P0 的单页面、单 API、固定 AMIS 运行时及其认证、授权和有界执行接线。
-P1 提供复杂控件与执行生命周期的独立验收门；P2 多页面/API 激活和 P3 编辑器不在当前范围。
+P1 提供复杂控件与执行生命周期的独立验收门；P2 多页面/API 正在实施，尚未通过本轮
+独立 CI、正式发布和部署组合验收。P3 编辑器不在当前实现范围。
 取用时必须核对所选提交的成功检查、独立发布 workflow 与 `release-provenance.json`；
 根仓生产组合验收是另一道必需门，不能把模型阶段的 jar 或组件测试当作 P0 阶段交付。
 总体需求基线为部署仓 `docs/amis-apps-requirements.md`，版本
@@ -348,3 +349,35 @@ P1 示例兼容既有 RBAC 安全输出解析：复杂 JSON 渲染放在公开
 `response` 使用 `type: JSON`，只引用固定路径 `{{ outputs.responseValue.value }}`。
 宿主将任务生成的 JSON 字符串解析为对象，数字、布尔值及数组保持类型。
 不得将复杂 `inputs` 表达式、函数或过滤器直接放入 Flow outputs 后要求放宽 RBAC 门。
+
+## P2 多页面与多 API（本地已验证，未发布）
+
+同一 Flow 的启用页面和 API 可分别有多个声明。页面导航、声明版本、逐 API 恢复及
+结果来源绑定见[运行时契约](docs/runtime-contract.md#p2-多声明与版本观察契约)。
+公开示例入口为 `examples/p2/scenarios.json`：正常场景包括同 Flow 的 `home/detail`
+页面与 `alpha/beta` API，以及同 namespace 的另一 Flow 和另一 namespace 的反控。
+`missing-output/invalid-output` 是单独应用并恢复的负向变体，不与正常场景同时覆盖。
+示例只重定位明确的 namespace，不改写页面导航字符串。
+
+新增门使用 `contracts/p2-cases.json` 固定 16 项测试 transport 和 18 项生产 execution；
+两种报告不能互相替代。保留既有 Java、UI 单元、P0 浏览器、偏好及 P1 全部具名门，
+再执行以下 P2 检查：
+
+```bash
+node --test scripts/test-p2-*.mjs
+npm --prefix ui run test:p2
+node scripts/run-p2-production.mjs OPTIONS_JSON
+```
+
+生产 runner 的私密参数由维护者安排独占 Docker 窗口后生成，沿用 P1 的 0600 配置、
+单 PostgreSQL、正式宿主输入及 owner 清理约束；`directory` 必须为本仓 `.work` 下
+尚不存在的绝对路径。P2 runner 独立启动并清理自己的组合，不复用 P1 的测试数据库。
+P2 生产并行与恢复用例将浏览器等待参数设为 `PT15S`，覆盖真实 8 秒任务；不把 P1
+用于主动验证超时的 `PT5S` 测试配置复制为 P2 的业务限制。P1 的超时生产门及 P2
+transport 的有界等待用例保持原有时限和断言。
+不得把本地候选 jar 用作部署仓的正式输入。发布须同时包含示例、固定清单、实际报告、
+原始业务响应实体附件及 provenance；认证响应与凭据不得进入公开附件。
+
+本节描述已通过本地完整验证的实现和入口：16 项测试 transport、18 项生产 execution、
+既有 Java/UI/P0/P1 门均在本地通过。尚未完成本提交的正式 CI、独立发布和根仓模式 A/B
+组合验收；正式产物取用规则及最终阶段门保持不变。

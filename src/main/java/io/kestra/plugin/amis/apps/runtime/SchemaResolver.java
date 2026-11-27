@@ -37,7 +37,7 @@ public final class SchemaResolver {
                 byte[] bytes = parser.readBounded(stream);
                 parser.parse(bytes);
                 JsonNode schema = AmisSchema.parse(bytes);
-                return Optional.of(new ResolvedSchema(candidate.namespace(), candidate.path(), schema));
+                return Optional.of(new ResolvedSchema(candidate.namespace(), candidate.path(), schema, bytes));
             }
         }
         return Optional.empty();
@@ -48,5 +48,15 @@ public final class SchemaResolver {
         Optional<InputStream> open(String namespace, String path) throws IOException;
     }
 
-    public record ResolvedSchema(String namespace, String path, JsonNode schema) { }
+    public record ResolvedSchema(String namespace, String path, JsonNode schema, byte[] bytes) {
+        public ResolvedSchema { bytes = bytes.clone(); }
+        @Override public byte[] bytes() { return bytes.clone(); }
+        public String sha256() {
+            try {
+                return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));
+            } catch (java.security.NoSuchAlgorithmException impossible) {
+                throw new IllegalStateException(impossible);
+            }
+        }
+    }
 }

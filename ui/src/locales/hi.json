@@ -16,6 +16,8 @@
     "resume": "Resume result query",
     "uncertain": "Submission outcome is unknown. Automatic retry is disabled.",
     "forget": "Forget execution reference",
-    "forgetConfirm": "Forgetting does not cancel the execution. A later explicit submission may create another execution. Continue?"
+    "forgetConfirm": "Forgetting does not cancel the execution. A later explicit submission may create another execution. Continue?",
+    "refreshRequired": "फ़्लो बदल गया है। फिर से सबमिट करने से पहले पेज रीफ़्रेश करें।",
+    "recoveredResult": "पुनर्प्राप्त व्यावसायिक परिणाम"
   }
 }

@@ -47,7 +47,7 @@ class PublishedExecutionResultsTest {
     private Execution execution(State.Type state) {
         return Execution.newExecution(flow, List.of()).toBuilder().id("execution123").originalId("execution123")
             .flowRevision(1).state(new State(state))
-            .trigger(ExecutionTrigger.of(trigger, Map.of("apiId", trigger.getApiId(), "caller", "test-user"))).build();
+            .trigger(ExecutionTrigger.of(trigger, Map.of("apiId", trigger.getApiId(), "caller", "test-user", "declarationRevision", 1))).build();
     }
 
     private PublishedExecutionResults service(boolean enabled) {
@@ -134,9 +134,43 @@ class PublishedExecutionResultsTest {
     }
 
     @Test void changedFlowRevisionIsConflictRatherThanMixedResultInterpretation() {
-        stored = Optional.of(execution(State.Type.SUCCESS).toBuilder().flowRevision(2).build());
-        assertEquals(HttpStatus.CONFLICT, assertThrows(HttpStatusException.class, () -> read(true)).getStatus());
+        stored = Optional.of(execution(State.Type.SUCCESS).toBuilder().flowRevision(2)
+            .trigger(ExecutionTrigger.of(trigger, Map.of("apiId", trigger.getApiId(), "declarationRevision", 2))).build());
+        assertEquals(HttpStatus.CONFLICT, assertThrows(RevisionConflictException.class, () -> read(true)).getStatus());
         assertFalse(trace.contains("outputs"));
+    }
+
+    @Test void p2SameFlowApisSelectDistinctOutputsAndRejectCrossApiExecution() {
+        Flow multi = YamlParser.parse(PackagedTriggerMain.coreFlow() + PackagedTriggerMain.declarations()
+            + "  - id: api-beta\n    type: io.kestra.plugin.amis.apps.ApiTrigger\n    apiId: beta\n    resultOutput: betaResponse\n"
+            + "outputs:\n  - id: response\n    type: JSON\n    value: {}\n  - id: betaResponse\n    type: JSON\n    value: {}\n", Flow.class).toBuilder().revision(1).build();
+        var selected = new PublishedFlowAccess.Snapshot(ProcessedFlow.of(FlowWithSource.of(multi, "multi")), RouteDeclarations.from(multi));
+        var beta = multi.getTriggers().stream().filter(ApiTrigger.class::isInstance).map(ApiTrigger.class::cast)
+            .filter(value -> value.getApiId().equals("beta")).findFirst().orElseThrow();
+        values = Map.of("response", Map.of("alpha", 7), "betaResponse", Map.of("beta", true));
+        var alphaResult = service(false).read(Authentication.build("ordinary-user"), selected, trigger.getApiId(), "execution123").block();
+        assertEquals(7, alphaResult.data().path("alpha").asInt());
+        assertFalse(alphaResult.data().has("beta"));
+        trace.clear();
+        assertEquals(HttpStatus.NOT_FOUND, assertThrows(HttpStatusException.class, () -> service(false)
+            .read(Authentication.build("ordinary-user"), selected, "beta", "execution123").block()).getStatus());
+        assertFalse(trace.contains("outputs"));
+        stored = Optional.of(execution(State.Type.SUCCESS).withTrigger(ExecutionTrigger.of(beta,
+            Map.of("apiId", "beta", "declarationRevision", 1))));
+        var betaResult = service(false).read(Authentication.build("ordinary-user"), selected, "beta", "execution123").block();
+        assertTrue(betaResult.data().path("beta").asBoolean());
+        assertFalse(betaResult.data().has("alpha"));
+    }
+
+    @Test void p2MissingOrForgedTriggerRevisionIsNotFoundBeforeOutputRead() {
+        for (Map<String, Object> variables : List.<Map<String, Object>>of(
+            Map.of("apiId", trigger.getApiId()),
+            Map.of("apiId", trigger.getApiId(), "declarationRevision", 2),
+            Map.of("apiId", trigger.getApiId(), "declarationRevision", "1"))) {
+            stored = Optional.of(execution(State.Type.SUCCESS).withTrigger(ExecutionTrigger.of(trigger, variables)));
+            assertEquals(HttpStatus.NOT_FOUND, assertThrows(HttpStatusException.class, () -> read(true)).getStatus());
+            assertFalse(trace.contains("outputs"));
+        }
     }
 
     @Test void absentOutputRemainsPendingButExplicitEmptyObjectIsReady() {

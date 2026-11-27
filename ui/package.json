@@ -11,7 +11,8 @@
     "test:translations": "node scripts/translations.mjs",
     "test:preferences:red": "playwright test --config playwright.preferences.config.mjs",
     "preview": "vite preview --host 127.0.0.1 --port 4177",
-    "test:p1": "playwright test --config playwright.p1.config.mjs"
+    "test:p1": "playwright test --config playwright.p1.config.mjs",
+    "test:p2": "playwright test --config playwright.p2.config.mjs"
   },
   "dependencies": {
     "amis": "6.13.0",

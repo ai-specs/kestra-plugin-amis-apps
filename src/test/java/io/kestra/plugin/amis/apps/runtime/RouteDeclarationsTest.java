@@ -68,15 +68,19 @@ class RouteDeclarationsTest {
     }
 
     @Test
+    // Historical P0 ID retained; P2 replaces the old limit rejection with activation.
     void p0LimitRejectsMultipleDeclarationsWithoutRejectingTheModelSnapshot() {
         String declaration = PackagedTriggerMain.declarations()
             + "  - id: page-other\n    type: " + PageTrigger.class.getName() + "\n    pageId: other\n    schema: nsfile:///other.json\n"
             + "  - id: api-other\n    type: " + ApiTrigger.class.getName() + "\n    apiId: other\n";
         RouteDeclarations routes = RouteDeclarations.from(flow(declaration));
-        assertEquals(RouteDeclarations.Status.P0_DECLARATION_LIMIT, routes.activation());
-        assertEquals(RouteDeclarations.Status.P0_DECLARATION_LIMIT,
+        assertEquals(RouteDeclarations.Status.ACTIVE, routes.activation());
+        assertEquals(2, routes.pages().size());
+        assertEquals(2, routes.apis().size());
+        assertEquals(RouteDeclarations.Status.ACTIVE, routes.api("company._team", "model.test", "other").status());
+        assertEquals(RouteDeclarations.Status.ACTIVE,
             routes.page("company._team", "model.test", "home").status());
-        assertEquals(RouteDeclarations.Status.P0_DECLARATION_LIMIT,
+        assertEquals(RouteDeclarations.Status.ACTIVE,
             routes.api("company._team", "model.test", "home").status());
     }
 

@@ -38,6 +38,13 @@ class ReleasePackagingTest(unittest.TestCase):
         (self.root / 'contracts/p1-cases.json').write_text(json.dumps({'schemaVersion': 1, 'transport': ['P1 transport'], 'production': ['P1 production']}))
         (self.root / 'examples/p1').mkdir(parents=True)
         (self.root / 'examples/p1/scenarios.json').write_text('{"schemaVersion":1,"scenarios":[]}')
+        # Explicit synthetic P2 package data: never production acceptance evidence.
+        (self.root / 'examples/p2').mkdir(parents=True)
+        (self.root / 'examples/p2/scenarios.json').write_text('{"schemaVersion":1,"synthetic":true,"scenarios":[]}')
+        (self.root / 'contracts/p2-cases.json').write_text(json.dumps({'schemaVersion':1,'stage':'P2','transport':['synthetic transport'],'production':['synthetic production'],'productionPlan':{'synthetic production':{'namespace':'synthetic.ns','flowId':'synthetic-flow','apis':{'alpha':{'triggerId':'invokeAlpha','resultOutput':'alphaResponse','expectedNewExecutions':0}}}}}))
+        (self.root / 'scripts').mkdir()
+        for name in ['p2-report.mjs','p2-diagnostics.mjs','p2-collector-binding.mjs','p2-case-facts.mjs','p2-abandoned.mjs','check-p2-report.mjs']:
+            (self.root / 'scripts' / name).write_bytes((Path(__file__).parent / name).read_bytes())
         self.git('add', '.')
         self.git('commit', '-qm', 'Test packaging source')
         self.commit = self.git('rev-parse', 'HEAD')
@@ -66,6 +73,20 @@ class ReleasePackagingTest(unittest.TestCase):
                 report.update(sourceStable=True, sourceAtStart=boundary, sourceAtEnd=boundary)
             (self.root / 'ui/reports' / ('p1-' + kind + '.json')).write_text(json.dumps(report))
 
+        for kind in ['transport', 'production']:
+            name = 'synthetic ' + kind
+            value = {'schemaVersion':1,'scope':'production-execution','caseId':name,'synthetic':False,'caller':'synthetic-user','identity':{'subject':'synthetic-user','signatureVerified':True},'consoleErrors':[],'diagnostics':{'errors':[],'requests':[],'responses':[]},'diagnosticClassifications':[],'executionIds':[],'collectorEvents':[], 'flows':[{'namespace':'synthetic.ns','expectedFlowId':'synthetic-flow','executionIds':[],'apis':[{'apiId':'alpha','triggerId':'invokeAlpha','resultOutput':'alphaResponse','caller':'synthetic-user','expectedNewExecutions':0,'beforeExecutionIds':[],'afterExecutionIds':[],'executionIds':[],'executions':[],'requests':[],'responses':[]}]}]}
+            evidence = self.root / 'ui/reports' / ('p2-' + kind + '-evidence.json')
+            collector = self.root / ('ui/reports/synthetic-' + kind + '-collector.json')
+            collector.write_text(json.dumps({'schemaVersion':1,'caseId':name,'source':'chromium-cdp','integrity':[],'events':[]}))
+            value['immutableDiagnostics'] = {'path':collector.name,'sha256':release.sha256(collector)}
+            evidence.write_text(json.dumps(value))
+            report = {'schemaVersion':1,'stage':'P2','scope':'test-transport' if kind == 'transport' else 'production-execution','manifestSha256':release.sha256(self.root / 'contracts/p2-cases.json'),'sourceCommit':self.commit,'sourceSha256':self.source_hash(),'hostImage':'formal-test-input','hostExecutableSha256':'b'*64,'jarSha256':release.sha256(self.root / 'build/libs/test.jar') if kind == 'production' else None,'passed':True,'stats':{'expected':1,'passed':1,'failed':0,'skipped':0,'notRun':0},'cases':[{'id':name,'status':'passed','evidence':[{'path':evidence.name,'sha256':release.sha256(evidence)}]}]}
+            if kind == 'production':
+                boundary = {'sourceCommit':self.commit,'sourceSha256':self.source_hash()}
+                report.update(sourceStable=True,sourceAtStart=boundary,sourceAtEnd=boundary)
+            (self.root / 'ui/reports' / ('p2-' + kind + '.json')).write_text(json.dumps(report))
+
     def source_hash(self):
         import hashlib
         names = sorted(filter(None, subprocess.check_output(['git', 'ls-files', '--cached', '--others', '--exclude-standard', '-z'], cwd=self.root).decode().split('\0')))
@@ -74,6 +95,26 @@ class ReleasePackagingTest(unittest.TestCase):
 
     def git(self, *arguments):
         return subprocess.check_output(['git', *arguments], cwd=self.root, text=True).strip()
+
+    def test_p2_missing_report_or_manifest_binding_is_rejected(self):
+        path = self.root / 'ui/reports/p2-production.json'
+        original = path.read_text()
+        path.unlink()
+        with self.assertRaises(subprocess.CalledProcessError):
+            release.stage(self.root / '.work/p2-missing')
+        report = json.loads(original)
+        report['manifestSha256'] = '0' * 64
+        path.write_text(json.dumps(report))
+        with self.assertRaises(subprocess.CalledProcessError):
+            release.stage(self.root / '.work/p2-manifest')
+
+    def test_p2_semantic_evidence_tamper_and_source_drift_rejected(self):
+        path = self.root / 'ui/reports/p2-production.json'
+        report = json.loads(path.read_text())
+        report['sourceAtEnd']['sourceSha256'] = '0' * 64
+        path.write_text(json.dumps(report))
+        with self.assertRaises(subprocess.CalledProcessError):
+            release.stage(self.root / '.work/p2-drift')
 
     def test_clean_snapshot_binds_jar_and_exact_committed_source(self):
         destination = self.root / '.work/release-image'

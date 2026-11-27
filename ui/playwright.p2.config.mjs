@@ -1,0 +1,2 @@
+import {defineConfig}from'@playwright/test';
+export default defineConfig({testDir:'./tests',testMatch:'p2.spec.mjs',fullyParallel:false,workers:1,timeout:30000,outputDir:'test-results-p2',reporter:[['./scripts/p2-report.mjs'],['list'],['json',{outputFile:'reports/p2-chromium.json'}]],use:{browserName:'chromium',channel:'chromium',locale:'en-US',baseURL:'http://127.0.0.1:4179',screenshot:'on',trace:'retain-on-failure'},webServer:{command:'npm run preview -- --port 4179',url:'http://127.0.0.1:4179',reuseExistingServer:false}});

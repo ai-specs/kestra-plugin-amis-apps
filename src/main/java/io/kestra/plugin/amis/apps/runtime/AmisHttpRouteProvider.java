@@ -136,8 +136,16 @@ public final class AmisHttpRouteProvider implements HttpExtensionRouteProviderV1
             if (identity == null || identity.getName() == null || identity.getName().isBlank()) throw failure(HttpStatus.UNAUTHORIZED);
             return AuthorizationEvaluationContext.call(() -> access.lookupAfterEntry(route.namespace(), route.flowId()))
                 .flatMap(snapshot -> invocation.finishRequest().then(Mono.defer(() -> access.withFlowExecutionPermission(identity, snapshot,
-                    () -> dispatch(request, identity, route, snapshot)))));
+                    () -> {
+                        requireExpectedRevision(request, snapshot);
+                        return dispatch(request, identity, route, snapshot)
+                            .map(response -> response.header("X-AMIS-Flow-Revision", snapshot.declarations().flowRevision().toString()));
+                    }))));
         }).switchIfEmpty(Mono.error(failure(HttpStatus.SERVICE_UNAVAILABLE)))
+            .onErrorResume(RevisionConflictException.class, conflict -> Mono.<MutableHttpResponse<?>>just(HttpResponse.status(HttpStatus.CONFLICT)
+                .header("X-AMIS-Error-Code", "FLOW_REVISION_CONFLICT")
+                .contentType("application/json")
+                .body(Map.of("status", 1, "msg", "Flow declaration changed", "data", Map.of(), "code", "FLOW_REVISION_CONFLICT"))))
             .<MutableHttpResponse<?>>map(response -> response.header("Cache-Control", "no-store").header("X-Content-Type-Options", "nosniff"))
             .subscribeOn(Schedulers.boundedElastic());
     }
@@ -148,17 +156,28 @@ public final class AmisHttpRouteProvider implements HttpExtensionRouteProviderV1
             case "pages" -> {
                 requirePage(snapshot, route.item());
                 String prefix = "/" + route.namespace() + "/" + route.flowId();
-                var bootstrap = Map.of("version", 1, "namespace", route.namespace(), "flowId", route.flowId(),
-                    "pageId", route.item(), "schemaUrl", prefix + "/schemas/" + route.item(),
-                    "apiBase", prefix + "/apis/", "assetBase", prefix + "/assets/",
-                    "limits", Map.of("requestTimeoutMs", 30000, "pollIntervalMs", 250, "pollTimeoutMs", pollTimeoutMs));
+                var bootstrap = new java.util.LinkedHashMap<String, Object>();
+                bootstrap.put("version", 1);
+                bootstrap.put("namespace", route.namespace());
+                bootstrap.put("flowId", route.flowId());
+                bootstrap.put("pageId", route.item());
+                bootstrap.put("flowRevision", snapshot.declarations().flowRevision());
+                bootstrap.put("pageIds", snapshot.declarations().pages().stream().filter(page -> !page.disabled()).map(RouteDeclarations.Page::pageId).toList());
+                bootstrap.put("apiIds", snapshot.declarations().apis().stream().filter(api -> !api.disabled()).map(RouteDeclarations.Api::apiId).toList());
+                bootstrap.put("schemaUrl", prefix + "/schemas/" + route.item());
+                bootstrap.put("apiBase", prefix + "/apis/");
+                bootstrap.put("assetBase", prefix + "/assets/");
+                bootstrap.put("limits", Map.of("requestTimeoutMs", 30000, "pollIntervalMs", 250, "pollTimeoutMs", pollTimeoutMs));
                 yield Mono.fromCallable(() -> documents.response(request, prefix + "/", mapper.writeValueAsString(bootstrap)));
             }
             case "schemas" -> {
                 var page = requirePage(snapshot, route.item());
                 yield schemas.resolve(identity, snapshot, route.namespace(), "nsfile://" + page.schema().path())
-                    .map(schema -> HttpResponse.ok(schema.orElseThrow(() -> failure(HttpStatus.NOT_FOUND)).schema())
-                        .contentType("application/json"));
+                    .map(schema -> {
+                        var resolved = schema.orElseThrow(() -> failure(HttpStatus.NOT_FOUND));
+                        return HttpResponse.ok(resolved.bytes()).header("X-AMIS-Schema-SHA256", resolved.sha256())
+                            .contentType("application/json");
+                    });
             }
             case "assets" -> {
                 if (snapshot.declarations().pages().isEmpty()
@@ -172,6 +191,16 @@ public final class AmisHttpRouteProvider implements HttpExtensionRouteProviderV1
             case "apis" -> submit(request, identity, snapshot, route.item());
             default -> Mono.error(failure(HttpStatus.NOT_FOUND));
         };
+    }
+
+    private void requireExpectedRevision(HttpRequest<?> request, PublishedFlowAccess.Snapshot snapshot) {
+        var values = request.getHeaders().getAll("X-AMIS-Flow-Revision");
+        if (values.isEmpty()) return;
+        if (values.size() != 1 || !values.getFirst().matches("[1-9][0-9]{0,9}")) throw failure(HttpStatus.BAD_REQUEST);
+        final int expected;
+        try { expected = Integer.parseInt(values.getFirst()); }
+        catch (NumberFormatException invalid) { throw failure(HttpStatus.BAD_REQUEST); }
+        if (expected != snapshot.declarations().flowRevision()) throw new RevisionConflictException();
     }
 
     private Mono<MutableHttpResponse<?>> submit(HttpRequest<?> request, Authentication identity,

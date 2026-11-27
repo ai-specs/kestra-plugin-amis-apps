@@ -10,3 +10,8 @@ header a, [role="alert"] a { color: inherit; text-decoration: underline; }
 @media (max-width: 480px) { header { gap: .75rem; } main { padding: .75rem; } input { max-width: 100%; } }
 
 .amis-content { border: 0; margin: 0; padding: 0; min-width: 0; }
+
+[data-api-id] { border: 1px solid var(--borderColor); border-radius: .25rem; padding: 1rem; margin-block: 1rem; min-width: 0; }
+[data-api-id] h2 { margin-top: 0; font-size: 1rem; overflow-wrap: anywhere; }
+[data-api-id] button { font: inherit; margin-inline-end: .5rem; margin-bottom: .5rem; }
+[data-api-id] pre { white-space: pre-wrap; overflow-wrap: anywhere; max-width: 100%; }

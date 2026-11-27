@@ -10,9 +10,9 @@ import sys
 GENERATED_TREES = ('build/libs', 'build/reports', 'build/test-results', 'ui/reports')
 GENERATED_FILES = ('.integration/host-provenance.json', '.integration/host-public-types.txt', '.integration/host-flow-validation.txt')
 # Uploaded diagnostics are validated as regular paths but are not packaging inputs.
-DIAGNOSTICS = ('ui/test-results', 'ui/test-results-preferences-red', 'ui/test-results-p1', '.work/gate-tests', '.work/host-evidence-tests')
-SOURCE_TREES = ('examples/p1',)
-SOURCE_FILES = ('contracts/p1-cases.json',)
+DIAGNOSTICS = ('ui/test-results', 'ui/test-results-preferences-red', 'ui/test-results-p1', 'ui/test-results-p2', '.work/gate-tests', '.work/host-evidence-tests')
+SOURCE_TREES = ('examples/p1', 'examples/p2')
+SOURCE_FILES = ('contracts/p1-cases.json', 'contracts/p2-cases.json')
 
 
 def digest(path):

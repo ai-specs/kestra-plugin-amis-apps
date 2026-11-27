@@ -16,6 +16,8 @@
     "resume": "继续查询结果",
     "uncertain": "提交结果尚未确认，已禁止自动重试。",
     "forget": "清除执行引用",
-    "forgetConfirm": "清除引用不会取消执行。之后主动提交可能创建另一条执行。是否继续？"
+    "forgetConfirm": "清除引用不会取消执行。之后主动提交可能创建另一条执行。是否继续？",
+    "refreshRequired": "Flow 声明已变更。请刷新页面后再提交。",
+    "recoveredResult": "已恢复的业务结果"
   }
 }

@@ -22,10 +22,10 @@ class RestoreTest(unittest.TestCase):
         self.artifact.mkdir()
         subprocess.run(['git', 'init', '-q', str(self.target)], check=True)
         self.put(self.target, '.gitignore', '/build/\n/ui/reports/\n/.integration/\n/.work/\n')
-        for name, value in [('examples/p1/conditional.json', '{"type":"page"}'), ('contracts/p1-cases.json', '{"production":[]}'), ('host-contract.properties', 'overlay.image=formal@sha256:test\n')]:
+        for name, value in [('examples/p1/conditional.json', '{"type":"page"}'), ('contracts/p1-cases.json', '{"production":[]}'), ('contracts/p2-cases.json', '{"production":[]}'), ('examples/p2/scenarios.json', '{"schemaVersion":1}'), ('host-contract.properties', 'overlay.image=formal@sha256:test\n')]:
             self.put(self.target, name, value)
         subprocess.run(['git', 'add', '.'], cwd=self.target, check=True)
-        for name in ['examples/p1/conditional.json', 'contracts/p1-cases.json']:
+        for name in ['examples/p1/conditional.json', 'contracts/p1-cases.json', 'contracts/p2-cases.json', 'examples/p2/scenarios.json']:
             self.put(self.artifact, name, (self.target / name).read_text())
         for name in restore.GENERATED_TREES:
             self.put(self.artifact, name + '/evidence', 'tested bytes')
@@ -41,6 +41,14 @@ class RestoreTest(unittest.TestCase):
         path = base / name
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(value)
+
+    def test_p2_fixed_manifest_cannot_be_overwritten_by_artifact(self):
+        original = (self.target / 'contracts/p2-cases.json').read_bytes()
+        self.put(self.artifact, 'contracts/p2-cases.json', '{"production":["forged"]}')
+        with self.assertRaisesRegex(AssertionError, 'source content differs'):
+            restore.restore(self.target, self.artifact)
+        self.assertEqual((self.target / 'contracts/p2-cases.json').read_bytes(), original)
+        self.assertFalse((self.target / 'build').exists())
 
     def test_existing_tracked_examples_are_compared_never_overwritten(self):
         source = self.target / 'examples/p1/conditional.json'

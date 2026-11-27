@@ -16,6 +16,8 @@
     "resume": "Resume result query",
     "uncertain": "Submission outcome is unknown. Automatic retry is disabled.",
     "forget": "Forget execution reference",
-    "forgetConfirm": "Forgetting does not cancel the execution. A later explicit submission may create another execution. Continue?"
+    "forgetConfirm": "Forgetting does not cancel the execution. A later explicit submission may create another execution. Continue?",
+    "refreshRequired": "Przepływ został zmieniony. Odśwież stronę przed ponownym wysłaniem.",
+    "recoveredResult": "Odzyskany wynik biznesowy"
   }
 }

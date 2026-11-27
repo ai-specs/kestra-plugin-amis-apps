@@ -1,0 +1,115 @@
+{
+  "schemaVersion": 1,
+  "scenarios": [
+    {
+      "id": "multi-app",
+      "namespace": "company.p2",
+      "flowId": "multi-app",
+      "flow": "examples/p2/multi-app.yaml",
+      "pages": [
+        {
+          "pageId": "home",
+          "schema": "examples/p2/home.json",
+          "namespaceFile": "/p2/home.json"
+        },
+        {
+          "pageId": "detail",
+          "schema": "examples/p2/detail.json",
+          "namespaceFile": "/p2/detail.json"
+        }
+      ],
+      "apis": [
+        {
+          "apiId": "alpha",
+          "triggerId": "invokeAlpha",
+          "resultOutput": "alphaResponse",
+          "expectedMarker": "P2-ALPHA"
+        },
+        {
+          "apiId": "beta",
+          "triggerId": "invokeBeta",
+          "resultOutput": "betaResponse",
+          "expectedMarker": "P2-BETA"
+        }
+      ]
+    },
+    {
+      "id": "other-app",
+      "namespace": "company.p2",
+      "flowId": "other-app",
+      "flow": "examples/p2/other-app.yaml",
+      "pages": [
+        {
+          "pageId": "home",
+          "schema": "examples/p2/home.json",
+          "namespaceFile": "/p2/home.json"
+        },
+        {
+          "pageId": "detail",
+          "schema": "examples/p2/detail.json",
+          "namespaceFile": "/p2/detail.json"
+        }
+      ],
+      "apis": [
+        {
+          "apiId": "alpha",
+          "triggerId": "invokeAlpha",
+          "resultOutput": "alphaResponse",
+          "expectedMarker": "P2-ALPHA"
+        },
+        {
+          "apiId": "beta",
+          "triggerId": "invokeBeta",
+          "resultOutput": "betaResponse",
+          "expectedMarker": "P2-BETA"
+        }
+      ]
+    },
+    {
+      "id": "other-namespace",
+      "namespace": "company.p2other",
+      "flowId": "multi-app",
+      "flow": "examples/p2/other-namespace.yaml",
+      "pages": [
+        {
+          "pageId": "home",
+          "schema": "examples/p2/home.json",
+          "namespaceFile": "/p2/home.json"
+        },
+        {
+          "pageId": "detail",
+          "schema": "examples/p2/detail.json",
+          "namespaceFile": "/p2/detail.json"
+        }
+      ],
+      "apis": [
+        {
+          "apiId": "alpha",
+          "triggerId": "invokeAlpha",
+          "resultOutput": "alphaResponse",
+          "expectedMarker": "P2-ALPHA"
+        },
+        {
+          "apiId": "beta",
+          "triggerId": "invokeBeta",
+          "resultOutput": "betaResponse",
+          "expectedMarker": "P2-BETA"
+        }
+      ]
+    }
+  ],
+  "variants": [
+    {
+      "variantOf": "multi-app",
+      "id": "missing-output",
+      "flow": "examples/p2/missing-output.yaml",
+      "purpose": "Declared resultOutput absent: POST409 with zero new execution"
+    },
+    {
+      "variantOf": "multi-app",
+      "id": "invalid-output",
+      "flow": "examples/p2/invalid-output.yaml",
+      "purpose": "Declared JSON result is array: result query409 without empty success"
+    }
+  ]
+}

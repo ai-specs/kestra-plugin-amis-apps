@@ -26,15 +26,14 @@ public final class AsyncSchemaResolver {
     public Mono<Optional<SchemaResolver.ResolvedSchema>> resolve(String currentNamespace, String schemaUri) {
         final SchemaReference reference = SchemaReference.parse(schemaUri);
         return Flux.fromIterable(reference.candidates(currentNamespace))
-            .concatMap(candidate -> readCandidate(candidate)
-                .map(schema -> schema.map(value -> new SchemaResolver.ResolvedSchema(candidate.namespace(), candidate.path(), value))))
+            .concatMap(candidate -> readCandidate(candidate))
             .takeUntil(Optional::isPresent)
             .filter(Optional::isPresent)
             .next()
             .defaultIfEmpty(Optional.empty());
     }
 
-    private Mono<Optional<JsonNode>> readCandidate(SchemaReference.Candidate candidate) {
+    private Mono<Optional<SchemaResolver.ResolvedSchema>> readCandidate(SchemaReference.Candidate candidate) {
         return Mono.defer(() -> {
             Mono<Optional<byte[]>> result = reader.read(candidate.namespace(), candidate.path());
             if (result == null) {
@@ -45,7 +44,7 @@ public final class AsyncSchemaResolver {
                     try {
                         if (bytes.isEmpty()) return Mono.just(Optional.empty());
                         parser.parse(bytes.orElseThrow());
-                        return Mono.just(Optional.of(AmisSchema.parse(bytes.orElseThrow())));
+                        return Mono.just(Optional.of(new SchemaResolver.ResolvedSchema(candidate.namespace(), candidate.path(), AmisSchema.parse(bytes.orElseThrow()), bytes.orElseThrow())));
                     } catch (IllegalArgumentException exception) {
                         return Mono.error(new InvalidSchemaException(exception));
                     }

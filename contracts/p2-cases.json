@@ -1,0 +1,1033 @@
+{
+  "schemaVersion": 1,
+  "stage": "P2",
+  "observationWindowMs": 30000,
+  "observationScope": "Measured declaration update observation window, not an availability SLA",
+  "revision": {
+    "header": "X-AMIS-Flow-Revision",
+    "request": "optional; browser carries bootstrap flowRevision",
+    "schemaHash": "observation-only-not-CAS"
+  },
+  "transport": [
+    "P2-T01-home-detail-native-navigation",
+    "P2-T02-navigation-escape-rejected",
+    "P2-T03-alpha-beta-result-isolation",
+    "P2-T04-parallel-services-two-apis",
+    "P2-T05-same-api-double-activation",
+    "P2-T06-same-api-different-input-busy",
+    "P2-T07-cancel-alpha-keeps-beta",
+    "P2-T08-paused-per-api-keyboard-cancel",
+    "P2-T09-refresh-resumes-two-confirmed-ids",
+    "P2-T10-unknown-alpha-keeps-beta-recoverable",
+    "P2-T11-pending-auth-relogin",
+    "P2-T12-recovery-record-isolation",
+    "P2-T13-cross-api-response-binding-rejected",
+    "P2-T14-stale-schema-post-conflict",
+    "P2-T15-delayed-output-bounded-timeout",
+    "P2-T16-dual-api-theme-locale-focus"
+  ],
+  "production": [
+    "P2-P01-alpha-typed-persisted-output",
+    "P2-P02-beta-distinct-persisted-output",
+    "P2-P03-apiid-forgery-zero-execution",
+    "P2-P04-cross-api-poll-denied",
+    "P2-P05-cross-flow-poll-denied",
+    "P2-P06-missing-output-declaration",
+    "P2-P07-declared-invalid-output",
+    "P2-P08-running-delayed-real-result",
+    "P2-P09-revision-change-poll-conflict",
+    "P2-P10-stale-page-post",
+    "P2-P11-schema-only-replacement",
+    "P2-P12-two-api-concurrent",
+    "P2-P13-two-api-refresh-recovery",
+    "P2-P14-pause-one-api-other-completes",
+    "P2-P15-unknown-post-one-response-drop",
+    "P2-P16-relogin-recovery-authorization",
+    "P2-P17-declaration-update-disable-delete",
+    "P2-P18-restart-declaration-and-recovery"
+  ],
+  "productionPlan": {
+    "P2-P01-alpha-typed-persisted-output": {
+      "namespace": "company.p2",
+      "flowId": "multi-app",
+      "pageIds": [
+        "home",
+        "detail"
+      ],
+      "apis": {
+        "alpha": {
+          "triggerId": "invokeAlpha",
+          "resultOutput": "alphaResponse",
+          "expectedNewExecutions": 1,
+          "expectedInputs": {
+            "apiId": "alpha",
+            "action": "save",
+            "marker": "P2-INPUT-ALPHA",
+            "quantity": 3,
+            "enabled": true,
+            "tags": [
+              "one",
+              "two"
+            ]
+          },
+          "expectedOutput": {
+            "api": "alpha",
+            "marker": "P2-ALPHA",
+            "inputMarker": "P2-INPUT-ALPHA",
+            "quantity": 3,
+            "enabled": true,
+            "tags": [
+              "one",
+              "two"
+            ],
+            "alphaOnly": "alpha-value"
+          },
+          "outputPolicy": "typed-object",
+          "requireBrowserResult": true
+        }
+      },
+      "observationWindowMs": null
+    },
+    "P2-P02-beta-distinct-persisted-output": {
+      "namespace": "company.p2",
+      "flowId": "multi-app",
+      "pageIds": [
+        "home",
+        "detail"
+      ],
+      "apis": {
+        "beta": {
+          "triggerId": "invokeBeta",
+          "resultOutput": "betaResponse",
+          "expectedNewExecutions": 1,
+          "expectedInputs": {
+            "apiId": "beta",
+            "action": "save",
+            "marker": "P2-INPUT-BETA",
+            "quantity": 3,
+            "enabled": true,
+            "tags": [
+              "one",
+              "two"
+            ]
+          },
+          "expectedOutput": {
+            "api": "beta",
+            "marker": "P2-BETA",
+            "inputMarker": "P2-INPUT-BETA",
+            "quantity": 3,
+            "enabled": true,
+            "tags": [
+              "one",
+              "two"
+            ],
+            "betaOnly": true
+          },
+          "outputPolicy": "typed-object",
+          "requireBrowserResult": true
+        }
+      },
+      "observationWindowMs": null
+    },
+    "P2-P03-apiid-forgery-zero-execution": {
+      "namespace": "company.p2",
+      "flowId": "multi-app",
+      "pageIds": [
+        "home",
+        "detail"
+      ],
+      "apis": {
+        "alpha": {
+          "triggerId": "invokeAlpha",
+          "resultOutput": "alphaResponse",
+          "expectedNewExecutions": 0,
+          "expectedInputs": {
+            "apiId": "alpha",
+            "action": "save",
+            "marker": "P2-INPUT-ALPHA",
+            "quantity": 3,
+            "enabled": true,
+            "tags": [
+              "one",
+              "two"
+            ]
+          },
+          "expectedOutput": {
+            "api": "alpha",
+            "marker": "P2-ALPHA",
+            "inputMarker": "P2-INPUT-ALPHA",
+            "quantity": 3,
+            "enabled": true,
+            "tags": [
+              "one",
+              "two"
+            ],
+            "alphaOnly": "alpha-value"
+          },
+          "outputPolicy": "typed-object",
+          "requireBrowserResult": false
+        }
+      },
+      "observationWindowMs": null
+    },
+    "P2-P04-cross-api-poll-denied": {
+      "namespace": "company.p2",
+      "flowId": "multi-app",
+      "pageIds": [
+        "home",
+        "detail"
+      ],
+      "apis": {
+        "alpha": {
+          "triggerId": "invokeAlpha",
+          "resultOutput": "alphaResponse",
+          "expectedNewExecutions": 1,
+          "expectedInputs": {
+            "apiId": "alpha",
+            "action": "save",
+            "marker": "P2-INPUT-ALPHA",
+            "quantity": 3,
+            "enabled": true,
+            "tags": [
+              "one",
+              "two"
+            ]
+          },
+          "expectedOutput": {
+            "api": "alpha",
+            "marker": "P2-ALPHA",
+            "inputMarker": "P2-INPUT-ALPHA",
+            "quantity": 3,
+            "enabled": true,
+            "tags": [
+              "one",
+              "two"
+            ],
+            "alphaOnly": "alpha-value"
+          },
+          "outputPolicy": "typed-object",
+          "requireBrowserResult": true
+        },
+        "beta": {
+          "triggerId": "invokeBeta",
+          "resultOutput": "betaResponse",
+          "expectedNewExecutions": 0,
+          "expectedInputs": {
+            "apiId": "beta",
+            "action": "save",
+            "marker": "P2-INPUT-BETA",
+            "quantity": 3,
+            "enabled": true,
+            "tags": [
+              "one",
+              "two"
+            ]
+          },
+          "expectedOutput": {
+            "api": "beta",
+            "marker": "P2-BETA",
+            "inputMarker": "P2-INPUT-BETA",
+            "quantity": 3,
+            "enabled": true,
+            "tags": [
+              "one",
+              "two"
+            ],
+            "betaOnly": true
+          },
+          "outputPolicy": "typed-object",
+          "requireBrowserResult": false
+        }
+      },
+      "observationWindowMs": null
+    },
+    "P2-P05-cross-flow-poll-denied": {
+      "namespace": "company.p2",
+      "flowId": "multi-app",
+      "pageIds": [
+        "home",
+        "detail"
+      ],
+      "apis": {
+        "alpha": {
+          "triggerId": "invokeAlpha",
+          "resultOutput": "alphaResponse",
+          "expectedNewExecutions": 1,
+          "expectedInputs": {
+            "apiId": "alpha",
+            "action": "save",
+            "marker": "P2-INPUT-ALPHA",
+            "quantity": 3,
+            "enabled": true,
+            "tags": [
+              "one",
+              "two"
+            ]
+          },
+          "expectedOutput": {
+            "api": "alpha",
+            "marker": "P2-ALPHA",
+            "inputMarker": "P2-INPUT-ALPHA",
+            "quantity": 3,
+            "enabled": true,
+            "tags": [
+              "one",
+              "two"
+            ],
+            "alphaOnly": "alpha-value"
+          },
+          "outputPolicy": "typed-object",
+          "requireBrowserResult": true
+        }
+      },
+      "observationWindowMs": null,
+      "counterBindings": [
+        {
+          "namespace": "company.p2",
+          "flowId": "other-app"
+        },
+        {
+          "namespace": "company.p2other",
+          "flowId": "multi-app"
+        }
+      ]
+    },
+    "P2-P06-missing-output-declaration": {
+      "namespace": "company.p2",
+      "flowId": "multi-app",
+      "pageIds": [
+        "home",
+        "detail"
+      ],
+      "apis": {
+        "alpha": {
+          "triggerId": "invokeAlpha",
+          "resultOutput": "missingResponse",
+          "expectedNewExecutions": 0,
+          "expectedInputs": {
+            "apiId": "alpha",
+            "action": "save",
+            "marker": "P2-INPUT-ALPHA",
+            "quantity": 3,
+            "enabled": true,
+            "tags": [
+              "one",
+              "two"
+            ]
+          },
+          "expectedOutput": {
+            "api": "alpha",
+            "marker": "P2-ALPHA",
+            "inputMarker": "P2-INPUT-ALPHA",
+            "quantity": 3,
+            "enabled": true,
+            "tags": [
+              "one",
+              "two"
+            ],
+            "alphaOnly": "alpha-value"
+          },
+          "outputPolicy": "typed-object",
+          "requireBrowserResult": false
+        }
+      },
+      "observationWindowMs": null,
+      "variant": "missing-output"
+    },
+    "P2-P07-declared-invalid-output": {
+      "namespace": "company.p2",
+      "flowId": "multi-app",
+      "pageIds": [
+        "home",
+        "detail"
+      ],
+      "apis": {
+        "alpha": {
+          "triggerId": "invokeAlpha",
+          "resultOutput": "alphaResponse",
+          "expectedNewExecutions": 1,
+          "expectedInputs": {
+            "apiId": "alpha",
+            "action": "save",
+            "marker": "P2-INPUT-ALPHA",
+            "quantity": 3,
+            "enabled": true,
+            "tags": [
+              "one",
+              "two"
+            ]
+          },
+          "expectedOutput": {
+            "api": "alpha",
+            "marker": "P2-ALPHA",
+            "inputMarker": "P2-INPUT-ALPHA",
+            "quantity": 3,
+            "enabled": true,
+            "tags": [
+              "one",
+              "two"
+            ],
+            "alphaOnly": "alpha-value"
+          },
+          "outputPolicy": "invalid-json-object-refused-409",
+          "requireBrowserResult": false
+        }
+      },
+      "observationWindowMs": null,
+      "variant": "invalid-output"
+    },
+    "P2-P08-running-delayed-real-result": {
+      "namespace": "company.p2",
+      "flowId": "multi-app",
+      "pageIds": [
+        "home",
+        "detail"
+      ],
+      "apis": {
+        "alpha": {
+          "triggerId": "invokeAlpha",
+          "resultOutput": "alphaResponse",
+          "expectedNewExecutions": 1,
+          "expectedInputs": {
+            "apiId": "alpha",
+            "action": "slow",
+            "marker": "P2-INPUT-ALPHA",
+            "quantity": 3,
+            "enabled": true,
+            "tags": [
+              "one",
+              "two"
+            ]
+          },
+          "expectedOutput": {
+            "api": "alpha",
+            "marker": "P2-ALPHA",
+            "inputMarker": "P2-INPUT-ALPHA",
+            "quantity": 3,
+            "enabled": true,
+            "tags": [
+              "one",
+              "two"
+            ],
+            "alphaOnly": "alpha-value"
+          },
+          "outputPolicy": "typed-object",
+          "requireBrowserResult": true
+        }
+      },
+      "observationWindowMs": null
+    },
+    "P2-P09-revision-change-poll-conflict": {
+      "namespace": "company.p2",
+      "flowId": "multi-app",
+      "pageIds": [
+        "home",
+        "detail"
+      ],
+      "apis": {
+        "alpha": {
+          "triggerId": "invokeAlpha",
+          "resultOutput": "alphaResponse",
+          "expectedNewExecutions": 1,
+          "expectedInputs": {
+            "apiId": "alpha",
+            "action": "save",
+            "marker": "P2-INPUT-ALPHA",
+            "quantity": 3,
+            "enabled": true,
+            "tags": [
+              "one",
+              "two"
+            ]
+          },
+          "expectedOutput": {
+            "api": "alpha",
+            "marker": "P2-ALPHA",
+            "inputMarker": "P2-INPUT-ALPHA",
+            "quantity": 3,
+            "enabled": true,
+            "tags": [
+              "one",
+              "two"
+            ],
+            "alphaOnly": "alpha-value"
+          },
+          "outputPolicy": "typed-object",
+          "requireBrowserResult": false
+        }
+      },
+      "observationWindowMs": 30000
+    },
+    "P2-P10-stale-page-post": {
+      "namespace": "company.p2",
+      "flowId": "multi-app",
+      "pageIds": [
+        "home",
+        "detail"
+      ],
+      "apis": {
+        "alpha": {
+          "triggerId": "invokeAlpha",
+          "resultOutput": "alphaResponse",
+          "expectedNewExecutions": 1,
+          "expectedInputs": {
+            "apiId": "alpha",
+            "action": "save",
+            "marker": "P2-INPUT-ALPHA",
+            "quantity": 3,
+            "enabled": true,
+            "tags": [
+              "one",
+              "two"
+            ]
+          },
+          "expectedOutput": {
+            "api": "alpha",
+            "marker": "P2-ALPHA",
+            "inputMarker": "P2-INPUT-ALPHA",
+            "quantity": 3,
+            "enabled": true,
+            "tags": [
+              "one",
+              "two"
+            ],
+            "alphaOnly": "alpha-value"
+          },
+          "outputPolicy": "typed-object",
+          "requireBrowserResult": true
+        }
+      },
+      "observationWindowMs": 30000,
+      "phases": [
+        "old-page-revision-post-409-zero-new",
+        "refreshed-page-post-one-new"
+      ]
+    },
+    "P2-P11-schema-only-replacement": {
+      "namespace": "company.p2",
+      "flowId": "multi-app",
+      "pageIds": [
+        "home",
+        "detail"
+      ],
+      "apis": {
+        "alpha": {
+          "triggerId": "invokeAlpha",
+          "resultOutput": "alphaResponse",
+          "expectedNewExecutions": 1,
+          "expectedInputs": {
+            "apiId": "alpha",
+            "action": "save",
+            "marker": "P2-INPUT-ALPHA",
+            "quantity": 3,
+            "enabled": true,
+            "tags": [
+              "one",
+              "two"
+            ]
+          },
+          "expectedOutput": {
+            "api": "alpha",
+            "marker": "P2-ALPHA",
+            "inputMarker": "P2-INPUT-ALPHA",
+            "quantity": 3,
+            "enabled": true,
+            "tags": [
+              "one",
+              "two"
+            ],
+            "alphaOnly": "alpha-value"
+          },
+          "outputPolicy": "typed-object",
+          "requireBrowserResult": true
+        }
+      },
+      "observationWindowMs": 30000,
+      "schemaPolicy": "observe-content-sha256-only; old page continues already downloaded object; no CAS"
+    },
+    "P2-P12-two-api-concurrent": {
+      "namespace": "company.p2",
+      "flowId": "multi-app",
+      "pageIds": [
+        "home",
+        "detail"
+      ],
+      "apis": {
+        "alpha": {
+          "triggerId": "invokeAlpha",
+          "resultOutput": "alphaResponse",
+          "expectedNewExecutions": 1,
+          "expectedInputs": {
+            "apiId": "alpha",
+            "action": "slow",
+            "marker": "P2-INPUT-ALPHA",
+            "quantity": 3,
+            "enabled": true,
+            "tags": [
+              "one",
+              "two"
+            ]
+          },
+          "expectedOutput": {
+            "api": "alpha",
+            "marker": "P2-ALPHA",
+            "inputMarker": "P2-INPUT-ALPHA",
+            "quantity": 3,
+            "enabled": true,
+            "tags": [
+              "one",
+              "two"
+            ],
+            "alphaOnly": "alpha-value"
+          },
+          "outputPolicy": "typed-object",
+          "requireBrowserResult": true
+        },
+        "beta": {
+          "triggerId": "invokeBeta",
+          "resultOutput": "betaResponse",
+          "expectedNewExecutions": 1,
+          "expectedInputs": {
+            "apiId": "beta",
+            "action": "slow",
+            "marker": "P2-INPUT-BETA",
+            "quantity": 3,
+            "enabled": true,
+            "tags": [
+              "one",
+              "two"
+            ]
+          },
+          "expectedOutput": {
+            "api": "beta",
+            "marker": "P2-BETA",
+            "inputMarker": "P2-INPUT-BETA",
+            "quantity": 3,
+            "enabled": true,
+            "tags": [
+              "one",
+              "two"
+            ],
+            "betaOnly": true
+          },
+          "outputPolicy": "typed-object",
+          "requireBrowserResult": true
+        }
+      },
+      "observationWindowMs": null
+    },
+    "P2-P13-two-api-refresh-recovery": {
+      "namespace": "company.p2",
+      "flowId": "multi-app",
+      "pageIds": [
+        "home",
+        "detail"
+      ],
+      "apis": {
+        "alpha": {
+          "triggerId": "invokeAlpha",
+          "resultOutput": "alphaResponse",
+          "expectedNewExecutions": 1,
+          "expectedInputs": {
+            "apiId": "alpha",
+            "action": "slow",
+            "marker": "P2-INPUT-ALPHA",
+            "quantity": 3,
+            "enabled": true,
+            "tags": [
+              "one",
+              "two"
+            ]
+          },
+          "expectedOutput": {
+            "api": "alpha",
+            "marker": "P2-ALPHA",
+            "inputMarker": "P2-INPUT-ALPHA",
+            "quantity": 3,
+            "enabled": true,
+            "tags": [
+              "one",
+              "two"
+            ],
+            "alphaOnly": "alpha-value"
+          },
+          "outputPolicy": "typed-object",
+          "requireBrowserResult": true
+        },
+        "beta": {
+          "triggerId": "invokeBeta",
+          "resultOutput": "betaResponse",
+          "expectedNewExecutions": 1,
+          "expectedInputs": {
+            "apiId": "beta",
+            "action": "slow",
+            "marker": "P2-INPUT-BETA",
+            "quantity": 3,
+            "enabled": true,
+            "tags": [
+              "one",
+              "two"
+            ]
+          },
+          "expectedOutput": {
+            "api": "beta",
+            "marker": "P2-BETA",
+            "inputMarker": "P2-INPUT-BETA",
+            "quantity": 3,
+            "enabled": true,
+            "tags": [
+              "one",
+              "two"
+            ],
+            "betaOnly": true
+          },
+          "outputPolicy": "typed-object",
+          "requireBrowserResult": true
+        }
+      },
+      "observationWindowMs": null
+    },
+    "P2-P14-pause-one-api-other-completes": {
+      "namespace": "company.p2",
+      "flowId": "multi-app",
+      "pageIds": [
+        "home",
+        "detail"
+      ],
+      "apis": {
+        "alpha": {
+          "triggerId": "invokeAlpha",
+          "resultOutput": "alphaResponse",
+          "expectedNewExecutions": 1,
+          "expectedInputs": {
+            "apiId": "alpha",
+            "action": "pause",
+            "marker": "P2-INPUT-ALPHA",
+            "quantity": 3,
+            "enabled": true,
+            "tags": [
+              "one",
+              "two"
+            ]
+          },
+          "expectedOutput": {
+            "api": "alpha",
+            "marker": "P2-ALPHA",
+            "inputMarker": "P2-INPUT-ALPHA",
+            "quantity": 3,
+            "enabled": true,
+            "tags": [
+              "one",
+              "two"
+            ],
+            "alphaOnly": "alpha-value"
+          },
+          "outputPolicy": "typed-object",
+          "requireBrowserResult": true
+        },
+        "beta": {
+          "triggerId": "invokeBeta",
+          "resultOutput": "betaResponse",
+          "expectedNewExecutions": 1,
+          "expectedInputs": {
+            "apiId": "beta",
+            "action": "save",
+            "marker": "P2-INPUT-BETA",
+            "quantity": 3,
+            "enabled": true,
+            "tags": [
+              "one",
+              "two"
+            ]
+          },
+          "expectedOutput": {
+            "api": "beta",
+            "marker": "P2-BETA",
+            "inputMarker": "P2-INPUT-BETA",
+            "quantity": 3,
+            "enabled": true,
+            "tags": [
+              "one",
+              "two"
+            ],
+            "betaOnly": true
+          },
+          "outputPolicy": "typed-object",
+          "requireBrowserResult": true
+        }
+      },
+      "observationWindowMs": null
+    },
+    "P2-P15-unknown-post-one-response-drop": {
+      "namespace": "company.p2",
+      "flowId": "multi-app",
+      "pageIds": [
+        "home",
+        "detail"
+      ],
+      "apis": {
+        "alpha": {
+          "triggerId": "invokeAlpha",
+          "resultOutput": "alphaResponse",
+          "expectedNewExecutions": 1,
+          "expectedInputs": {
+            "apiId": "alpha",
+            "action": "slow",
+            "marker": "P2-INPUT-ALPHA",
+            "quantity": 3,
+            "enabled": true,
+            "tags": [
+              "one",
+              "two"
+            ]
+          },
+          "expectedOutput": {
+            "api": "alpha",
+            "marker": "P2-ALPHA",
+            "inputMarker": "P2-INPUT-ALPHA",
+            "quantity": 3,
+            "enabled": true,
+            "tags": [
+              "one",
+              "two"
+            ],
+            "alphaOnly": "alpha-value"
+          },
+          "outputPolicy": "typed-object",
+          "requireBrowserResult": false
+        },
+        "beta": {
+          "triggerId": "invokeBeta",
+          "resultOutput": "betaResponse",
+          "expectedNewExecutions": 1,
+          "expectedInputs": {
+            "apiId": "beta",
+            "action": "slow",
+            "marker": "P2-INPUT-BETA",
+            "quantity": 3,
+            "enabled": true,
+            "tags": [
+              "one",
+              "two"
+            ]
+          },
+          "expectedOutput": {
+            "api": "beta",
+            "marker": "P2-BETA",
+            "inputMarker": "P2-INPUT-BETA",
+            "quantity": 3,
+            "enabled": true,
+            "tags": [
+              "one",
+              "two"
+            ],
+            "betaOnly": true
+          },
+          "outputPolicy": "typed-object",
+          "requireBrowserResult": true
+        }
+      },
+      "observationWindowMs": null,
+      "faultPolicy": "one exact POST confirmation response drop after server acceptance; no business transport interception; DB one execution; no implicit retry"
+    },
+    "P2-P16-relogin-recovery-authorization": {
+      "namespace": "company.p2",
+      "flowId": "multi-app",
+      "pageIds": [
+        "home",
+        "detail"
+      ],
+      "apis": {
+        "alpha": {
+          "triggerId": "invokeAlpha",
+          "resultOutput": "alphaResponse",
+          "expectedNewExecutions": 1,
+          "expectedInputs": {
+            "apiId": "alpha",
+            "action": "save",
+            "marker": "P2-INPUT-ALPHA",
+            "quantity": 3,
+            "enabled": true,
+            "tags": [
+              "one",
+              "two"
+            ]
+          },
+          "expectedOutput": {
+            "api": "alpha",
+            "marker": "P2-ALPHA",
+            "inputMarker": "P2-INPUT-ALPHA",
+            "quantity": 3,
+            "enabled": true,
+            "tags": [
+              "one",
+              "two"
+            ],
+            "alphaOnly": "alpha-value"
+          },
+          "outputPolicy": "typed-object",
+          "requireBrowserResult": true
+        }
+      },
+      "observationWindowMs": null,
+      "layer": "plugin-mode-A-logout-session-loss-same-subject-reauthentication-only",
+      "rootModeBRequired": "separate root gate: fresh account lacking target grants denied without effects; plugin A does not assert fake scopes"
+    },
+    "P2-P17-declaration-update-disable-delete": {
+      "namespace": "company.p2",
+      "flowId": "multi-app",
+      "pageIds": [
+        "home",
+        "detail"
+      ],
+      "apis": {
+        "alpha": {
+          "triggerId": "invokeAlpha",
+          "resultOutput": "alphaResponse",
+          "expectedNewExecutions": 0,
+          "expectedInputs": {
+            "apiId": "alpha",
+            "action": "save",
+            "marker": "P2-INPUT-ALPHA",
+            "quantity": 3,
+            "enabled": true,
+            "tags": [
+              "one",
+              "two"
+            ]
+          },
+          "expectedOutput": {
+            "api": "alpha",
+            "marker": "P2-ALPHA",
+            "inputMarker": "P2-INPUT-ALPHA",
+            "quantity": 3,
+            "enabled": true,
+            "tags": [
+              "one",
+              "two"
+            ],
+            "alphaOnly": "alpha-value"
+          },
+          "outputPolicy": "typed-object",
+          "requireBrowserResult": false
+        },
+        "beta": {
+          "triggerId": "invokeBeta",
+          "resultOutput": "betaResponse",
+          "expectedNewExecutions": 1,
+          "expectedInputs": {
+            "apiId": "beta",
+            "action": "save",
+            "marker": "P2-INPUT-BETA",
+            "quantity": 3,
+            "enabled": true,
+            "tags": [
+              "one",
+              "two"
+            ]
+          },
+          "expectedOutput": {
+            "api": "beta",
+            "marker": "P2-BETA",
+            "inputMarker": "P2-INPUT-BETA",
+            "quantity": 3,
+            "enabled": true,
+            "tags": [
+              "one",
+              "two"
+            ],
+            "betaOnly": true
+          },
+          "outputPolicy": "typed-object",
+          "requireBrowserResult": true
+        }
+      },
+      "observationWindowMs": 30000,
+      "declarationChanges": [
+        {
+          "change": "trigger-disable",
+          "finalStatus": 404
+        },
+        {
+          "change": "flow-disable",
+          "finalStatus": 409
+        },
+        {
+          "change": "delete",
+          "finalStatus": 404
+        }
+      ]
+    },
+    "P2-P18-restart-declaration-and-recovery": {
+      "namespace": "company.p2",
+      "flowId": "multi-app",
+      "pageIds": [
+        "home",
+        "detail"
+      ],
+      "apis": {
+        "alpha": {
+          "triggerId": "invokeAlpha",
+          "resultOutput": "alphaResponse",
+          "expectedNewExecutions": 1,
+          "expectedInputs": {
+            "apiId": "alpha",
+            "action": "slow",
+            "marker": "P2-INPUT-ALPHA",
+            "quantity": 3,
+            "enabled": true,
+            "tags": [
+              "one",
+              "two"
+            ]
+          },
+          "expectedOutput": {
+            "api": "alpha",
+            "marker": "P2-ALPHA",
+            "inputMarker": "P2-INPUT-ALPHA",
+            "quantity": 3,
+            "enabled": true,
+            "tags": [
+              "one",
+              "two"
+            ],
+            "alphaOnly": "alpha-value"
+          },
+          "outputPolicy": "typed-object",
+          "requireBrowserResult": true
+        },
+        "beta": {
+          "triggerId": "invokeBeta",
+          "resultOutput": "betaResponse",
+          "expectedNewExecutions": 1,
+          "expectedInputs": {
+            "apiId": "beta",
+            "action": "slow",
+            "marker": "P2-INPUT-BETA",
+            "quantity": 3,
+            "enabled": true,
+            "tags": [
+              "one",
+              "two"
+            ]
+          },
+          "expectedOutput": {
+            "api": "beta",
+            "marker": "P2-BETA",
+            "inputMarker": "P2-INPUT-BETA",
+            "quantity": 3,
+            "enabled": true,
+            "tags": [
+              "one",
+              "two"
+            ],
+            "betaOnly": true
+          },
+          "outputPolicy": "typed-object",
+          "requireBrowserResult": true
+        }
+      },
+      "observationWindowMs": 30000
+    }
+  }
+}

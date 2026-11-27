@@ -76,11 +76,12 @@ public final class PublishedExecutionResults {
                 || !snapshot.declarations().flowId().equals(execution.getFlowId())
                 || execution.getTenantId() != null && !execution.getTenantId().equals("main")
                 || trigger == null || !api.triggerId().equals(trigger.getId()) || !ApiTrigger.class.getName().equals(trigger.getType())
-                || variables == null || !api.apiId().equals(variables.get("apiId"))) {
+                || variables == null || !api.apiId().equals(variables.get("apiId"))
+                || !Objects.equals(execution.getFlowRevision(), variables.get("declarationRevision"))) {
                 throw new HttpStatusException(HttpStatus.NOT_FOUND, "Execution result does not belong to this API");
             }
             if (!Objects.equals(snapshot.declarations().flowRevision(), execution.getFlowRevision())) {
-                throw new HttpStatusException(HttpStatus.CONFLICT, "Execution declaration revision has changed");
+                throw new RevisionConflictException();
             }
             if (execution.getState() == null || execution.getState().getCurrent() == null) {
                 throw new HttpStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Execution state is unavailable");

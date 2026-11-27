@@ -1,0 +1,150 @@
+{
+  "type": "page",
+  "title": "P2 detail",
+  "body": [
+    {
+      "type": "button",
+      "label": "Open home",
+      "actionType": "url",
+      "url": "home"
+    },
+    {
+      "type": "form",
+      "name": "alphaForm",
+      "title": "Alpha operation",
+      "api": "post:alpha",
+      "body": [
+        {
+          "type": "input-text",
+          "name": "marker",
+          "label": "Alpha marker",
+          "value": "P2-INPUT-ALPHA",
+          "required": true
+        },
+        {
+          "type": "input-number",
+          "name": "quantity",
+          "label": "Quantity",
+          "value": 3
+        },
+        {
+          "type": "switch",
+          "name": "enabled",
+          "label": "Enabled",
+          "value": true
+        },
+        {
+          "type": "input-array",
+          "name": "tags",
+          "label": "Tags",
+          "value": [
+            "one",
+            "two"
+          ],
+          "items": {
+            "type": "input-text"
+          }
+        },
+        {
+          "type": "select",
+          "name": "action",
+          "label": "Action",
+          "value": "save",
+          "options": [
+            {
+              "label": "save",
+              "value": "save"
+            },
+            {
+              "label": "slow",
+              "value": "slow"
+            },
+            {
+              "label": "pause",
+              "value": "pause"
+            }
+          ]
+        },
+        {
+          "type": "tpl",
+          "tpl": "Alpha result: ${marker} / ${quantity} / ${enabled}"
+        }
+      ],
+      "actions": [
+        {
+          "type": "submit",
+          "label": "Submit alpha"
+        }
+      ]
+    },
+    {
+      "type": "form",
+      "name": "betaForm",
+      "title": "Beta operation",
+      "api": "post:beta",
+      "body": [
+        {
+          "type": "input-text",
+          "name": "marker",
+          "label": "Beta marker",
+          "value": "P2-INPUT-BETA",
+          "required": true
+        },
+        {
+          "type": "input-number",
+          "name": "quantity",
+          "label": "Quantity",
+          "value": 3
+        },
+        {
+          "type": "switch",
+          "name": "enabled",
+          "label": "Enabled",
+          "value": true
+        },
+        {
+          "type": "input-array",
+          "name": "tags",
+          "label": "Tags",
+          "value": [
+            "one",
+            "two"
+          ],
+          "items": {
+            "type": "input-text"
+          }
+        },
+        {
+          "type": "select",
+          "name": "action",
+          "label": "Action",
+          "value": "save",
+          "options": [
+            {
+              "label": "save",
+              "value": "save"
+            },
+            {
+              "label": "slow",
+              "value": "slow"
+            },
+            {
+              "label": "pause",
+              "value": "pause"
+            }
+          ]
+        },
+        {
+          "type": "tpl",
+          "tpl": "Beta result: ${marker} / ${quantity} / ${enabled}"
+        }
+      ],
+      "actions": [
+        {
+          "type": "submit",
+          "label": "Submit beta"
+        }
+      ]
+    }
+  ]
+}

@@ -61,8 +61,6 @@ public final class RouteDeclarations {
             activation = Status.DUPLICATE_PAGE_PATH;
         } else if (apis.stream().map(Api::apiId).distinct().count() != apis.size()) {
             activation = Status.DUPLICATE_API_PATH;
-        } else if (pages.size() > 1 || apis.size() > 1) {
-            activation = Status.P0_DECLARATION_LIMIT;
         } else {
             activation = Status.ACTIVE;
         }

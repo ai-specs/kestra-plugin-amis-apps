@@ -62,6 +62,23 @@ jobs:
             port: 18671, jar, jarSha256: createHash('sha256').update(readFileSync(jar)).digest('hex')}), {mode: 0o600});
           JS
           node scripts/run-p1-production.mjs .work/p1-ci-options.json
+      - name: Verify P2 fixed examples and report rejection tests without infrastructure
+        run: node --test scripts/test-p2-*.mjs
+      - name: Run P2 independent multi-page multi-API transport matrix
+        working-directory: ui
+        run: npm run test:p2
+      - name: Run P2 production executions after P1 cleanup with one isolated PostgreSQL
+        run: |
+          node --input-type=module <<'JS'
+          import {readFileSync,writeFileSync} from 'node:fs';
+          import {resolve} from 'node:path';
+          import {createHash} from 'node:crypto';
+          const jar=resolve('build/libs/kestra-plugin-amis-apps-0.0.1-SNAPSHOT.jar');
+          writeFileSync('.work/p2-ci-options.json',JSON.stringify({schemaVersion:1,startIsolatedStack:true,
+            directory:resolve('.work/p2-ci-production'),port:18672,jar,
+            jarSha256:createHash('sha256').update(readFileSync(jar)).digest('hex')}),{mode:0o600});
+          JS
+          node scripts/run-p2-production.mjs .work/p2-ci-options.json
       - name: Verify pinned Gradle launcher ignores unrelated runner defaults
         run: python3 scripts/test-gradle-launcher.py
       - name: Verify inherited image labels cannot claim the overlay source commit
@@ -88,8 +105,11 @@ jobs:
             ui/test-results/
             ui/test-results-preferences-red/
             ui/test-results-p1/
+            ui/test-results-p2/
             examples/p1/
+            examples/p2/
             contracts/p1-cases.json
+            contracts/p2-cases.json
             .integration/host-public-types.txt
             .integration/host-flow-validation.txt
             .work/gate-tests/

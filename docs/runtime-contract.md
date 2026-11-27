@@ -1,6 +1,6 @@
 # AMIS 运行时契约
 
-范围：P0 运行时与 P1 交互、执行生命周期契约。取用必须核对固定输入对应的成功检查和独立发布产物，不能仅凭
+范围：P0/P1 运行时、执行生命周期与 P2 多声明版本观察契约。取用必须核对固定输入对应的成功检查和独立发布产物，不能仅凭
 本文件判定某个镜像或 jar 已通过发布门。总体目标以部署仓确认的 AMIS Apps 需求为准。
 本文件只维护本扩展自己的字段、HTTP 与前端交互约定；根仓生产组合仍须独立验收。
 
@@ -10,7 +10,7 @@
 - `ApiTrigger`：`apiId`、`mode`（默认 `ASYNC`）、`syncTimeout`（仅显式 `SYNC`），
   `resultOutput`（默认 `response`，可改为实际 Flow output ID，不是任务 ID 或任务命名规则）。
 - trigger 自身 `id` 沿用宿主规则，与 pageId/apiId 分开。同 Flow 的页面和 API 可以同名，
-  同一类型的重复规范路径必须拒绝。P0 最多激活一个页面和一个 API，多声明不能静默任选。
+  同一类型的重复规范路径必须拒绝。P2 激活多个页面和 API，仍不得静默任选重复路径。
 - 两类均直接继承 `AbstractTrigger`，不继承匿名 Webhook trigger。
 - `kestra.amis-apps.enabled` 控制扩展业务 bean 注册；未启用或 jar 缺席不提供这些入口。
 - 入口能力 ID 为 `amis-apps`；模式 B 使用 `EXTENSION_ROUTE / EXECUTE` 及 namespace
@@ -44,7 +44,7 @@ execution，并核对 namespace、Flow、API 和执行来源。不得直接调�
 调用主体，不把任意 body 内容当作可信触发来源。不渲染客户端提供的模板表达式。
 
 `resultOutput` 从已声明的 Flow outputs 中选取当前 API 的 JSON 对象结果。定义缺失、
-类型错误和缺少结果不得当作空成功；P2 再验证多 API 来源隔离，P0 不提前开放多声明。
+类型错误和缺少结果不得当作空成功；多 API 必须遵守本节及 P2 来源隔离契约。
 
 ## 数据响应与轮询
 
@@ -213,3 +213,75 @@ kv_metadata、execution_outputs 的完整内容。侧效证据记录实际 cover
 `io.kestra.plugin.core.debug.Return` 任务的 `format` 中，再由 `type: JSON` 的 Flow
 output 引用该任务的 JSON 字符串。宿主按 JSON 类型解析为对象，保留数字、布尔值和数组。
 这复用现有执行授权与任务边界，不为输入表达式、函数、过滤器或动态输出路径放宽依赖门。
+
+## P2 多声明与版本观察契约
+
+本节定义 P2 实现契约，不代表候选源码已完成独立 CI、发布或根仓组合验收。
+同一 Flow 可以激活多个页面和 API；同类型规范 ID 必须唯一，trigger id 仍遵守宿主唯一规则。
+禁用单声明只关闭其路径；Flow 禁用或删除仍使其应用入口失败关闭。
+
+页面 bootstrap 保持 `version:1`，增添 `flowRevision`（正整数）、`pageIds`、`apiIds`。
+两个 ID 字段是本次 snapshot 中启用声明的规范 ID 字符串数组，按声明顺序排列、精确唯一，
+不包含禁用项。现有单页面/API字段保留。版本1旧客户端可以忽略新增字段。
+
+运行时成功响应提供 `X-AMIS-Flow-Revision`，值为本次实际选择的 Flow snapshot revision。
+调用方可以在请求中携带同名 header；P2 浏览器的 schema GET 和 API POST 必须携带
+bootstrap 已见 revision。为兼容既有直接调用，省略 header 时按本次最新 snapshot 处理。
+若携带，值必须是单个规范正十进制 int：拒绝重复 header、空值、空白、符号、前导零、零、
+逗号列表和溢出，返回400。身份及 Flow READ/EXECUTE 授权后比较，版本不符返回409；
+schema 不读取文件，POST 不创建 execution。不以版本比较替代权限或 CSRF。
+
+版本冲突必须与其他业务409区分：请求声明版本不符，或结果 execution 的声明版本与
+当前 Flow 版本不符时，响应为409，并携带固定
+`X-AMIS-Error-Code: FLOW_REVISION_CONFLICT`。此标识只在完整授权后产生，不包含实际
+revision 或资源细节。响应实体为固定 JSON 错误对象，不返回空实体；错误码与提示不
+包含输入、凭据或资源内容。缺失结果声明、非法输出、Flow 状态及其他409不得携带此标识。
+浏览器仅对409和该精确标识的组合要求刷新并禁止旧页面继续提交；普通或未知409保持
+失败状态与原执行引用，不猜测为版本变化，不自动重发 POST，也不锁定其他 API。
+
+Flow storage 是声明事实源；插件不缓存声明。每个请求先读取存储的当前 revision，再准确
+取得该 revision 的 processed Flow。缺少或不一致立即503，不回退旧 revision，不增加等待
+激活的重试。请求选择 snapshot 是声明一致性的线性化选择点：已选择旧 snapshot 的在途
+请求，包括 SYNC，可以按旧 snapshot 完成；新请求重新读取，旧 execution 遇当前声明
+revision 变化时409。此规则不表示原子 compare-and-submit，也不撤销已经提交的 execution。
+真实更新验收的观察上限 T 为30秒；观察超限必须判门失败。T 不是宿主激活 SLA，不新增
+运行时5秒 deadline，也不允许在观察窗口内用旧声明 fallback 掩盖不一致。
+
+schema GET 以 `application/json` 返回实际读取并校验后的原始文件字节，提供
+`X-AMIS-Schema-SHA256`，值为这些实际响应字节的 SHA256 小写十六进制。摘要对应当前
+到父级回溯后实际选中的文件；不是 JSON 重序列化后的摘要。schema 文件可在 Flow revision
+不变时独立更新；下一次 GET 重新读取并观察新摘要。已下载 schema 继续运行，不自动热替换。
+POST 不额外重读 schema，不实现 page/revision/schema 三元 CAS；不宣称 Flow 与文件原子快照。
+
+每个 API 从自身声明选择 `resultOutput`。不同 API 可选不同 output，也可显式共用同一 output；
+不得隐式选择首个 output 或按任务名猜测。普通任务生成复杂 typed JSON，Flow JSON output
+继续使用既有安全 literal 引用（例如 `{{ outputs.responseValue.value }}`），不放宽 RBAC parser。
+任务需要以 `inputs.apiId` 分支时必须声明该输入；服务端由实际 API 路径注入其值。body 中
+冲突的 apiId 为400。可信 trigger 的 id/type/apiId 及 declarationRevision 必须与 execution
+来源一致；缺少、伪造或类型不符的 declarationRevision 返回404，合法 execution 与当前
+声明版本变化返回409。每次结果 GET 仍重新授权，不增加 caller 相等的平行权限模型。
+
+未声明的 resultOutput 返回409，POST 不 start；声明存在但值尚不可读时，即使 execution
+已 SUCCESS 仍202 pending，保留原 ID，不取兄弟 API 输出替代。值必须为 JSON object，
+null/scalar/array 返回409；空 object 合法。永久缺值由既有有界浏览器轮询到期处理，不能
+转为空成功或隐式重 POST。生产任务 RUNNING 等待不能充当 SUCCESS 后输出延迟的证据。
+
+### 同 Flow 导航与逐 API 恢复
+
+页面导航只接受 bootstrap 中启用的 `pageIds`。目标可为裸 pageId，或当前
+`/{namespace}/{flowId}/pages/{pageId}` 的规范同源 URL；跨 Flow、跨 namespace、
+外链、查询串、片段和编码绕过均拒绝。导航使用整文档跳转，不依赖宿主 SPA 路由。
+导航目标仍重新经过生产认证、入口能力门和具体 Flow 执行授权。
+
+每个 API 独立维护等待、取消和恢复状态。同 API 的相同规范 JSON 输入在途合并；不同
+输入在已有请求运行时拒绝。不同 API 可并行，不得互相覆盖结果或取消状态。取消等待
+不取消服务端 execution。确认丢失时保留结果不确定状态，不隐式重发 POST。
+
+P2 恢复记录使用 `amis.execution.v2:{namespace}/{flowId}/{pageId}/{apiId}`，内容只含
+规范 API 路径、提交阶段和已确认的 executionId，不保存输入、结果或凭据。旧 v1
+记录先验证目标并写入 v2，再删除旧记录；发生冲突或写入失败时不得丢弃旧记录。
+刷新或重新进入页面后，必须显式继续查询原 ID，只发 GET，不重发 POST。
+
+正常首次表单完成由对应 AMIS 表单显示结果；显式恢复的结果显示在对应 API 的恢复
+区域。两种显示路径不同，不得要求首次成功也出现恢复区域，或把一个 API 的恢复
+结果广播到所有表单。验收必须同时核对真实可见结果与持久化的类型化输出。

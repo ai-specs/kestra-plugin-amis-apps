@@ -76,6 +76,7 @@ def stage(destination):
     jar_hash = sha256(artifacts[0])
     p1_reports = {kind: verify_p1(kind, commit, jar_hash) for kind in ['transport', 'production']}
     assert p1_reports['transport']['sourceSha256'] == p1_reports['production']['sourceSha256'], 'P1 report sources differ'
+    subprocess.check_call(['node', str(ROOT / 'scripts/check-p2-report.mjs'), str(ROOT), jar_hash], cwd=ROOT)
     payload = destination / 'release'
     payload.mkdir(parents=True)
     shutil.copy2(artifacts[0], payload / 'kestra-amis-apps.jar')
@@ -84,12 +85,18 @@ def stage(destination):
         assert source.is_dir(), source
         shutil.copytree(source, payload / target)
     shutil.copytree(ROOT / 'examples/p1', payload / 'examples/p1')
+    shutil.copytree(ROOT / 'examples/p2', payload / 'examples/p2')
     (payload / 'contracts').mkdir()
     shutil.copy2(ROOT / 'contracts/p1-cases.json', payload / 'contracts/p1-cases.json')
+    shutil.copy2(ROOT / 'contracts/p2-cases.json', payload / 'contracts/p2-cases.json')
     transport_report = payload / 'ui-reports/p1-transport.json'
     transport = json.loads(transport_report.read_text())
     transport['jarSha256'] = jar_hash
     transport_report.write_text(json.dumps(transport, indent=2) + '\n')
+    p2_transport = payload / 'ui-reports/p2-transport.json'
+    p2_value = json.loads(p2_transport.read_text())
+    p2_value['jarSha256'] = jar_hash
+    p2_transport.write_text(json.dumps(p2_value, indent=2) + '\n')
     shutil.copy2(ROOT / '.integration/host-provenance.json', payload / 'host-provenance.json')
     shutil.copy2(ROOT / 'host-contract.properties', payload / 'host-contract.properties')
     archive = payload / 'source.tar'
@@ -99,7 +106,7 @@ def stage(destination):
         assert all(not entry.issym() and not entry.islnk() and not Path(entry.name).is_absolute()
                    and '..' not in Path(entry.name).parts for entry in source), 'Unsafe source snapshot'
     files = {str(path.relative_to(payload)): sha256(path) for path in sorted(payload.rglob('*')) if path.is_file()}
-    provenance = {'schemaVersion': 1, 'repository': 'ai-specs/kestra-plugin-amis-apps', 'commit': commit,
+    provenance = {'schemaVersion': 1, 'stage': 'P2', 'repository': 'ai-specs/kestra-plugin-amis-apps', 'commit': commit,
                   'runId': os.environ.get('GITHUB_RUN_ID'), 'sourceCi': source_ci,
                   'jarSha256': sha256(payload / 'kestra-amis-apps.jar'),
                   'host': json.loads((payload / 'host-provenance.json').read_text()), 'files': files,
