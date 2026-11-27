@@ -13,13 +13,14 @@ async function updateCurrentDocument(page){currentDocument=await page.evaluate((
 
 const responseTasks=new WeakMap();
 const requestTerminals=new WeakMap();
+const responseBodies=new WeakMap();
 async function setup(page,options={}) {
  const html=await readFile(new URL('../dist/index.html',import.meta.url),'utf8');
  const evidence={schemaVersion:1,caseId:test.info().title,scope:'test-transport',synthetic:true,observations:[],requests:[],errors:[]};observations.set(page,evidence);
  const tasks=[];responseTasks.set(page,tasks);
  await page.addInitScript(()=>{Object.defineProperty(window,'__p2TransportDocumentId',{value:crypto.randomUUID()});});
  const requestRows=new WeakMap();
- page.on('response',response=>{const row=requestRows.get(response.request());if(row){row.httpStatus=response.status();row.responseAt=Date.now();tasks.push(response.json().then(body=>{row.body=body;}).catch(error=>{evidence.errors.push('API response JSON: '+error.message);}));requestTerminals.get(row).resolve();}});
+ page.on('response',response=>{const row=requestRows.get(response.request());if(row&&row.body===undefined){row.httpStatus=response.status();row.responseAt=Date.now();const body=responseBodies.get(response.request());if(body!==undefined)row.body=body;else tasks.push(response.json().then(value=>{row.body=value;}).catch(error=>{evidence.errors.push('API response JSON: '+error.message);}));requestTerminals.get(row).resolve();}});
  page.on('requestfailed',request=>{const row=requestRows.get(request);if(row){row.httpStatus=0;row.transportError=request.failure()?.errorText;row.responseAt=Date.now();requestTerminals.get(row).resolve();}});
  const state={hold:true,deny:false,...options};page.on('pageerror',error=>evidence.errors.push(error.message));
  await page.route('**/*',async route=>{
@@ -36,12 +37,13 @@ async function setup(page,options={}) {
    evidence.requests.push(row);requestRows.set(request,row);
    const document=currentDocument;
    Object.assign(row,document);
-   if(state.unknown&&api==='alpha'&&request.method()==='POST')return route.abort('failed');
-   if(state.conflict&&request.method()==='POST')return route.fulfill({status:409,headers:{...headers,'X-AMIS-Error-Code':'FLOW_REVISION_CONFLICT'},json:{status:1}});
-   if(state.deny&&request.method()==='GET')return route.fulfill({status:401,headers,json:{status:1}});
+   if(state.unknown&&api==='alpha'&&request.method()==='POST'){row.httpStatus=0;row.transportError='net::ERR_FAILED';row.responseAt=Date.now();requestTerminals.get(row).resolve();return route.abort('failed');}
+   if(state.conflict&&request.method()==='POST'){const body={status:1};responseBodies.set(request,body);row.httpStatus=409;row.body=body;row.responseAt=Date.now();requestTerminals.get(row).resolve();return route.fulfill({status:409,headers:{...headers,'X-AMIS-Error-Code':'FLOW_REVISION_CONFLICT'},json:body});}
+   if(state.deny&&request.method()==='GET'){const body={status:1};responseBodies.set(request,body);row.httpStatus=401;row.body=body;row.responseAt=Date.now();requestTerminals.get(row).resolve();return route.fulfill({status:401,headers,json:body});}
    const waiting=state.hold&&(!state.holdApi||state.holdApi===api);
    const body=state.cross&&api==='alpha'?pending('beta'):waiting?pending(api):ready(api);
    if(waiting&&state.outputPending)body.executionState='SUCCESS';
+   responseBodies.set(request,body);row.httpStatus=waiting?202:200;row.body=body;row.responseAt=Date.now();requestTerminals.get(row).resolve();
    return route.fulfill({status:waiting?202:200,headers,json:body});
   }
   return route.continue();
@@ -130,13 +132,13 @@ test('P2-T09-refresh-resumes-two-confirmed-ids',async({page})=>{
  const {state,evidence}=await setup(page);await submit(page,'alpha');await submit(page,'beta');await paused(page,'alpha');await paused(page,'beta');
  const before=await observe(page,'confirmed-ids',actual=>{expect(recordFor(actual,'alpha').executionId).toBe('exec-alpha');expect(recordFor(actual,'beta').executionId).toBe('exec-beta');});
  await Promise.all(responseTasks.get(page));
- await page.reload();await expect(region(page,'alpha').getByRole('button',{name:'Resume result query'})).toBeVisible();await expect(region(page,'beta').getByRole('button',{name:'Resume result query'})).toBeVisible();
+ await page.goto(origin+path('home'));await expect(region(page,'alpha').getByRole('button',{name:'Resume result query'})).toBeVisible();await expect(region(page,'beta').getByRole('button',{name:'Resume result query'})).toBeVisible();
  await observe(page,'reload',actual=>{expect(actual.documentId).not.toBe(before.documentId);expect(actual.timeOrigin).not.toBe(before.timeOrigin);expect(actual.session).toEqual(before.session);});
  state.hold=false;await resume(page,'alpha');await resume(page,'beta');expect(posts(evidence)).toHaveLength(2);
  await observe(page,'resume-get',actual=>{expect(JSON.parse(apiState(actual,'alpha').result)).toEqual(ready('alpha').data);expect(JSON.parse(apiState(actual,'beta').result)).toEqual(ready('beta').data);const requests=actual.requests.filter(row=>row.documentId!==before.documentId);expect(requests.map(row=>[row.method,row.path,row.httpStatus])).toEqual(['alpha','beta'].map(api=>['GET',prefix+'/apis/'+api+'/executions/exec-'+api,200]));});
 });
 test('P2-T10-unknown-alpha-keeps-beta-recoverable',async({page})=>{
- const {state,evidence}=await setup(page,{unknown:true,holdApi:'beta'});await submit(page,'alpha');await expect(region(page,'alpha')).toContainText('Submission outcome is unknown');await submit(page,'beta');await paused(page,'beta');await page.reload();await expect(region(page,'alpha')).toContainText('Submission outcome is unknown');await expect(region(page,'beta').getByRole('button',{name:'Resume result query'})).toBeVisible();expect(posts(evidence)).toHaveLength(2);
+ const {state,evidence}=await setup(page,{unknown:true,holdApi:'beta'});await submit(page,'alpha');await expect(region(page,'alpha')).toContainText('Submission outcome is unknown');await submit(page,'beta');await paused(page,'beta');await page.goto(origin+path('home'));await expect(region(page,'alpha')).toContainText('Submission outcome is unknown');await expect(region(page,'beta').getByRole('button',{name:'Resume result query'})).toBeVisible();expect(posts(evidence)).toHaveLength(2);
  await observe(page,'unknown-alpha',actual=>{expect(apiState(actual,'alpha').text).toContain('Submission outcome is unknown');expect(recordFor(actual,'alpha').phase).toBe('submitting');expect(recordFor(actual,'alpha').executionId).toBeUndefined();expect(actual.requests.filter(row=>row.method==='POST'&&row.apiId==='alpha')).toHaveLength(1);});
  state.hold=false;await resume(page,'beta');
  await observe(page,'beta-result',actual=>{expect(JSON.parse(apiState(actual,'beta').result)).toEqual(ready('beta').data);expect(recordFor(actual,'alpha').phase).toBe('submitting');expect(actual.requests.filter(row=>row.method==='POST')).toHaveLength(2);});
