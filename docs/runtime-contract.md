@@ -97,8 +97,8 @@ AMIS fetcher 仅调用同 Flow API 与经过验证的结果 URL；不向外部�
 
 阶段成功必须核对所选正式产物的 sourceCi、独立报告及根仓组合，文档本身不构成通过证据。保持单 Flow、单页面、单 API；多个测试 Flow
 分别覆盖场景，不提前开放 P2 多声明。固定消费正式 host digest
-`182e03ce88803dc6718bc0d32729e1002af0321fe1dc18d41925342aad17b988`，executable
-SHA-256 `18b390e1a2ba1452ce9729b1f149e0d6457735f762395c393b13b1ee9f628fb7`。
+`74ffa61a3c79e4e2d96370c6dacce01c8901735548a1beb961c1e4a4fc5f879a`，executable
+SHA-256 `9f1bfac31f1bd0ed2dcce0b38e81f003db67745df3797e1000945bc3259beffe`。
 
 ### 最小实施与现有机制复用
 
